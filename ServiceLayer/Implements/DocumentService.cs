@@ -12,62 +12,32 @@ namespace ServiceLayer.Implements
     public class DocumentService : IDocumentService
     {
         private readonly IDocumentRepository _documentRepository;
-        private readonly ISubjectRepository _subjectRepository;
-        private readonly IChapterRepository _chapterRepository;
         private readonly IDocumentChunkRepository _documentChunkRepository;
         private readonly IFileUploadService _fileUploadService;
         private readonly IServiceScopeFactory _scopeFactory;
 
         public DocumentService(
             IDocumentRepository documentRepository,
-            ISubjectRepository subjectRepository,
             IDocumentChunkRepository documentChunkRepository,
             IFileUploadService fileUploadService,
-            IChapterRepository chapterRepository,
             IServiceScopeFactory scopeFactory)
         {
             _documentRepository = documentRepository;
-            _subjectRepository = subjectRepository;
-            _chapterRepository = chapterRepository;
             _documentChunkRepository = documentChunkRepository;
             _fileUploadService = fileUploadService;
             _scopeFactory = scopeFactory;
         }
 
-        public async Task<(bool Success, string Message, int DocumentId)> UploadDocumentAsync(
-            IFormFile file,
-            string subjectId,
-            string? chapterId)
+        public async Task<(bool Success, string Message, int DocumentId)> UploadDocumentAsync(IFormFile file)
         {
             if (file == null || file.Length == 0)
                 return (false, "Vui lòng chọn file tải lên.", 0);
 
-            if (string.IsNullOrWhiteSpace(subjectId))
-                return (false, "ID môn học không được để trống.", 0);
-            
-            // Try to find subject by Name if it's not a GUID, assuming subjectId might be Name from the frontend
-            Subject? subject = null;
-            if (Guid.TryParse(subjectId, out var parsedSubjectId))
-            {
-                subject = await _subjectRepository.GetByIdAsync(subjectId);
-            }
-            else
-            {
-                 // subjectId is actually subjectName
-                 var subjects = await _subjectRepository.GetAllAsync();
-                 subject = subjects.FirstOrDefault(s => s.Name == subjectId);
-            }
-            
-            if (subject == null)
-                return (false, "Môn học không tồn tại.", 0);
-
-            var existed = await _documentRepository.ExistsAsync(
-                file.FileName,
-                subject.Id);
+            var existed = await _documentRepository.ExistsAsync(file.FileName);
 
             if (existed)
             {
-                return (false, "Tài liệu này đã tồn tại trong môn học.", 0);
+                return (false, "Tài liệu này đã tồn tại.", 0);
             }
 
             using var stream = file.OpenReadStream();
@@ -79,25 +49,12 @@ namespace ServiceLayer.Implements
                 return (false, $"Lỗi lưu file: {uploadError}", 0);
 
             var fileSize = _fileUploadService.GetFileSize(filePath);
-            Guid? chapterGuid = null;
-            if (!string.IsNullOrWhiteSpace(chapterId))
-            {
-                var chapter = await _chapterRepository.GetByIdAsync(chapterId);
-                if (chapter == null)
-                {
-                    _fileUploadService.DeleteFile(filePath);
-                    return (false, "Chương không tồn tại hoặc không hợp lệ.", 0);
-                }
-                chapterGuid = chapter.Id;
-            }
 
             var document = new Document
             {
                 FileName = file.FileName,
                 FilePath = filePath,
                 FileSize = fileSize,
-                SubjectId = subject.Id,
-                ChapterId = chapterGuid,
                 IndexStatus = "Pending",
                 UploadDate = DateTime.UtcNow
             };
@@ -110,7 +67,6 @@ namespace ServiceLayer.Implements
             {
                 using var scope = _scopeFactory.CreateScope();
                 var indexingService = scope.ServiceProvider.GetRequiredService<IIndexingService>();
-                // We need to fetch the document fresh inside the new scope to avoid DbContext issues
                 var docRepo = scope.ServiceProvider.GetRequiredService<IDocumentRepository>();
                 var docToProcess = await docRepo.GetByIdAsync(document.Id);
                 if (docToProcess != null)
@@ -122,9 +78,9 @@ namespace ServiceLayer.Implements
             return (true, "Tải lên thành công, đang xử lý dữ liệu AI...", document.Id);
         }
 
-        public async Task<IEnumerable<Document>> GetDocumentsAsync(string subjectId, string? chapterId = null)
+        public async Task<IEnumerable<Document>> GetDocumentsAsync()
         {
-            return await _documentRepository.GetCompletedDocumentsAsync(subjectId, chapterId);
+            return await _documentRepository.GetCompletedDocumentsAsync();
         }
 
         public async Task<Document?> GetByIdAsync(int id)

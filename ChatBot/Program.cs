@@ -88,28 +88,13 @@ builder.Services.AddSingleton<IFileUploadService>(new FileUploadService(uploadFo
 builder.Services.AddScoped<ITextExtractionService, TextExtractionService>();
 builder.Services.AddScoped<IChunkingService, ChunkingService>();
 builder.Services.AddScoped<IEmbeddingService>(sp => new EmbeddingService(
-    geminiApiKey ?? throw new InvalidOperationException("GEMINI_API_KEY or OPENAI_API_KEY not configured"),
-    sp.GetRequiredService<ISystemSettingService>()
+    geminiApiKey ?? throw new InvalidOperationException("GEMINI_API_KEY or OPENAI_API_KEY not configured")
 ));
 builder.Services.AddScoped<IChatService>(sp => new ChatService(geminiApiKey ?? throw new InvalidOperationException("GEMINI_API_KEY or OPENAI_API_KEY not configured")));
 builder.Services.AddScoped<IIndexingService, IndexingService>();
 builder.Services.AddScoped<IRetrievalService, RetrievalService>();
 builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IRagService, RagService>();
-
-
-builder.Services.AddScoped<IUniversityRepository, UniversityRepository>();
-builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
-builder.Services.AddScoped<IChapterRepository, ChapterRepository>();
-builder.Services.AddScoped<IUniversityService, UniversityService>();
-builder.Services.AddScoped<ISubjectService, SubjectService>();
-builder.Services.AddScoped<IChapterService, ChapterService>();
-builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
-
-
-
-builder.Services.AddScoped<IAccountRepository, AccountRepository>();
-builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
 
 // PayOS Configuration
 var payosClientId = Environment.GetEnvironmentVariable("PAYOS_CLIENT_ID") ?? "";

@@ -15,10 +15,6 @@ namespace BusinessObject.Entities
         [Required]
         public string Answer { get; set; } = string.Empty;
 
-        public Guid? SubjectId { get; set; }
-
-        public Guid? ChapterId { get; set; }
-
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public string? UserId { get; set; }

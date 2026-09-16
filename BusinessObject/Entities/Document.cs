@@ -23,14 +23,6 @@ namespace BusinessObject.Entities
         public DateTime UploadDate { get; set; } = DateTime.Now;
 
         [Required]
-        public Guid SubjectId { get; set; } // ID của môn học (Đề bài yêu cầu: Quản lý theo môn học/chương)
-
-        public Guid? ChapterId { get; set; } // Liên kết đến Chapter (null = tài liệu cho toàn bộ môn)
-
-        [ForeignKey("ChapterId")]
-        public virtual Chapter? Chapter { get; set; }
-
-        [Required]
         [StringLength(50)]
         public string IndexStatus { get; set; } = "Pending"; // Trạng thái indexing: Pending, Completed, Failed
 
@@ -38,8 +30,5 @@ namespace BusinessObject.Entities
 
         // Quan hệ 1 - N: Một file tài liệu sau khi băm sẽ sinh ra nhiều đoạn văn bản nhỏ (Chunks)
         public virtual ICollection<DocumentChunk> DocumentChunks { get; set; } = new List<DocumentChunk>();
-
-        [ForeignKey("SubjectId")]
-        public virtual Subject? Subject { get; set; }
     }
 }

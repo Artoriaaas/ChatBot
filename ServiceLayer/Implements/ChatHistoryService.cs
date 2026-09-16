@@ -36,8 +36,6 @@ namespace ServiceLayer.Implements
                 {
                     Question = question,
                     Answer = answer,
-                    SubjectId = subjectId,
-                    ChapterId = chapterId,
                     UserId = userId,
                     CreatedAt = DateTime.UtcNow,
 
@@ -84,17 +82,7 @@ namespace ServiceLayer.Implements
                     query = query.Where(ch => ch.UserId == userId);
                 }
 
-                if (subjectId.HasValue)
-                {
-                    query = query.Where(ch =>
-                        ch.SubjectId == subjectId.Value);
-                }
 
-                if (chapterId.HasValue)
-                {
-                    query = query.Where(ch =>
-                        ch.ChapterId == chapterId.Value);
-                }
 
                 var results = await query
                     .OrderByDescending(ch => ch.CreatedAt)

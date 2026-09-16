@@ -24,7 +24,6 @@ namespace DataAccessLayer.Repositories.Implements
         public async Task<Document?> GetByIdAsync(int id)
         {
             return await _context.Documents
-                .Include(d => d.Subject)
                 .Include(d => d.DocumentChunks)
                 .FirstOrDefaultAsync(d => d.Id == id);
         }
@@ -33,36 +32,17 @@ namespace DataAccessLayer.Repositories.Implements
         {
             return await _context.Documents
                 .Include(d => d.DocumentChunks)
-                .Include(d => d.Subject)
                 .FirstOrDefaultAsync(d => d.Id == id);
         }
 
-        public async Task<List<Document>> GetCompletedDocumentsAsync(string? subjectId = null, string? chapterId = null)
+        public async Task<List<Document>> GetCompletedDocumentsAsync()
         {
-            IQueryable<Document> query = _context.Documents.Include(d => d.Subject).Include(d => d.Chapter);
-
-            if (!string.IsNullOrWhiteSpace(subjectId) && Guid.TryParse(subjectId, out var parsedSubjectId))
-            {
-                query = query.Where(d => d.SubjectId == parsedSubjectId);
-            }
-            else if (!string.IsNullOrWhiteSpace(subjectId))
-            {
-                 // Handle subjectName case from old implementation
-                 query = query.Where(d => d.Subject.Name == subjectId);
-            }
-
-            if (!string.IsNullOrWhiteSpace(chapterId) && Guid.TryParse(chapterId, out var parsedChapterId))
-            {
-                query = query.Where(d => d.ChapterId == parsedChapterId);
-            }
-
-            return await query.ToListAsync();
+            return await _context.Documents.ToListAsync();
         }
 
-        public async Task<bool> ExistsAsync(string fileName, Guid subjectId)
+        public async Task<bool> ExistsAsync(string fileName)
         {
             return await _context.Documents.AnyAsync(d =>
-                d.SubjectId == subjectId &&
                 d.FileName.ToLower() == fileName.ToLower());
         }
 

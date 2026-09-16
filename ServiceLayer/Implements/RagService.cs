@@ -14,20 +14,17 @@ namespace ServiceLayer.Implements
         private readonly IRetrievalService _retrievalService;
         private readonly IChatService _chatService;
         private readonly IChatHistoryService _chatHistoryService;
-        private readonly ISubscriptionService _subscriptionService;
 
         public RagService(
             IEmbeddingService embeddingService,
             IRetrievalService retrievalService,
             IChatService chatService,
-            IChatHistoryService chatHistoryService,
-            ISubscriptionService subscriptionService)
+            IChatHistoryService chatHistoryService)
         {
             _embeddingService = embeddingService;
             _retrievalService = retrievalService;
             _chatService = chatService;
             _chatHistoryService = chatHistoryService;
-            _subscriptionService = subscriptionService;
         }
 
         public async Task<(bool success, RagResult? result, string? errorMessage)> AskAsync(
@@ -35,15 +32,6 @@ namespace ServiceLayer.Implements
         {
             if (string.IsNullOrWhiteSpace(question))
                 return (false, null, "Question cannot be empty");
-
-            // Bước 0: Check quota token hàng ngày
-            if (!string.IsNullOrEmpty(userId) && Guid.TryParse(userId, out var accountId))
-            {
-                if (!await _subscriptionService.HasRemainingTokenQuotaAsync(accountId))
-                {
-                    return (false, null, "Bạn đã dùng hết hạn mức token hôm nay. Vui lòng đăng ký/nâng cấp Premium để tiếp tục!");
-                }
-            }
 
             // Bước 1: Embed câu hỏi
             var (embedSuccess, embedding, embedError) = await _embeddingService.GetEmbeddingAsync(question);

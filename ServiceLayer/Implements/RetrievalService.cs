@@ -67,19 +67,7 @@ namespace ServiceLayer.Implements
                         c.DocumentId == documentId.Value);
                 }
 
-                if (subjectId.HasValue)
-                {
-                    query = query.Where(c =>
-                        c.Document != null &&
-                        c.Document.SubjectId == subjectId.Value);
-                }
 
-                if (chapterId.HasValue)
-                {
-                    query = query.Where(c =>
-                        c.Document != null &&
-                        c.Document.ChapterId == chapterId.Value);
-                }
 
                 if (maxDistance.HasValue)
                 {

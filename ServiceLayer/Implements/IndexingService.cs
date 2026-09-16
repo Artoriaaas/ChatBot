@@ -16,7 +16,6 @@ namespace ServiceLayer.Implements
         private readonly IChunkingService _chunkingService;
         private readonly IEmbeddingService _embeddingService;
         private readonly IMemoryCache _cache;
-        private readonly ISystemSettingService _settingService;
 
         public IndexingService(
             AppDbContext context,
@@ -26,8 +25,7 @@ namespace ServiceLayer.Implements
             IChunkingService chunkingService,
             IEmbeddingService embeddingService,
             IFileUploadService fileUploadService,
-            IMemoryCache cache,
-            ISystemSettingService settingService)
+            IMemoryCache cache)
         {
             _context = context;
             _documentRepository = documentRepository;
@@ -36,7 +34,6 @@ namespace ServiceLayer.Implements
             _chunkingService = chunkingService;
             _embeddingService = embeddingService;
             _cache = cache;
-            _settingService = settingService;
         }
 
         public async Task<(bool success, string? errorMessage)>
@@ -68,13 +65,11 @@ namespace ServiceLayer.Implements
                     return (false, extractError);
                 }
 
-                // 2. Lấy chunk size từ cấu hình Admin
-                var setting = await _settingService.GetSettingAsync();
-
+                // 2. Tự động băm nhỏ văn bản (mặc định ChunkSize = 512, Overlap = 50)
                 var chunks = _chunkingService.ChunkText(
                     extractedText ?? string.Empty,
-                    setting.ChunkSize,
-                    setting.ChunkOverlap);
+                    512,
+                    50);
 
                 if (chunks.Count == 0)
                 {

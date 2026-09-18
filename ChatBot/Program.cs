@@ -59,6 +59,17 @@ builder.Services.AddScoped<IDocumentChunkService, DocumentChunkService>();
 // Register custom services
 var uploadFolderPath = builder.Configuration["UploadFolderPath"] ?? "D:\\Upload";
 
+var supabaseUrl = builder.Configuration["Supabase:Url"] ?? builder.Configuration["SUPABASE_URL"];
+var supabaseKey = builder.Configuration["Supabase:Key"] ?? builder.Configuration["SUPABASE_KEY"];
+if (!string.IsNullOrEmpty(supabaseUrl) && !string.IsNullOrEmpty(supabaseKey))
+{
+    var options = new Supabase.SupabaseOptions
+    {
+        AutoConnectRealtime = true
+    };
+    var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey, options);
+    builder.Services.AddSingleton(supabaseClient);
+}
 
 var maxFileSize = long.TryParse(builder.Configuration["MaxFileSize"], out var size) ? size : 3145728; // 3MB default
 
@@ -84,7 +95,15 @@ Console.WriteLine(
     $"length={geminiApiKey.Length}");
 
 
-builder.Services.AddSingleton<IFileUploadService>(new FileUploadService(uploadFolderPath, maxFileSize));
+if (!string.IsNullOrEmpty(supabaseUrl) && !string.IsNullOrEmpty(supabaseKey))
+{
+    builder.Services.AddScoped<IFileUploadService, SupabaseStorageService>();
+}
+else
+{
+    builder.Services.AddSingleton<IFileUploadService>(new FileUploadService(uploadFolderPath, maxFileSize));
+}
+builder.Services.AddHttpClient<IGrobidService, GrobidService>();
 builder.Services.AddScoped<ITextExtractionService, TextExtractionService>();
 builder.Services.AddScoped<IChunkingService, ChunkingService>();
 builder.Services.AddScoped<IEmbeddingService>(sp => new EmbeddingService(
@@ -114,14 +133,11 @@ else
     builder.Services.AddSingleton(new PayOSClient("placeholder", "placeholder", "placeholder"));
 }
 
-builder.Services.AddScoped<ISubscriptionService, SubscriptionService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "RequestVerificationToken";
 });
-builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddAuthentication(options =>
     {
@@ -200,6 +216,11 @@ builder.Services.AddAuthentication(options =>
         options.AccessDeniedPath = "/Auth/AccessDenied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.Cookie.Name = "ChatBot.Auth.Student";
+    })
+    .AddGoogle(options =>
+    {
+        options.ClientId = builder.Configuration["Google:ClientId"] ?? builder.Configuration["GOOGLE_CLIENT_ID"] ?? "placeholder_client_id";
+        options.ClientSecret = builder.Configuration["Google:ClientSecret"] ?? builder.Configuration["GOOGLE_CLIENT_SECRET"] ?? "placeholder_client_secret";
     });
 
 builder.Services.AddAuthorization();
@@ -207,6 +228,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddRazorPages();
 builder.Services.AddSession();
 builder.Services.AddSignalR();
+builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -246,123 +268,17 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
+app.MapControllers();
 
 app.MapFallbackToPage("/Auth/Login");
 app.MapHub<ChatBot.Hubs.NotificationHub>("/notificationHub");
 
 //SeedDatabase(app);
-SeedSingleUniversity(app);
+
 app.Run();
 
-void SeedSingleUniversity(IHost webApp)
-{
-    using var scope = webApp.Services.CreateScope();
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<AppDbContext>();
-        
-        // 1. Ensure FPT University exists
-        var fptUni = context.Universities.FirstOrDefault(u => u.Code == "FPTU" || u.Name == "FPT University" || u.Id == 1);
-        if (fptUni == null)
-        {
-            fptUni = new University
-            {
-                Name = "FPT University",
-                Code = "FPTU"
-            };
-            context.Universities.Add(fptUni);
-            context.SaveChanges();
-        }
-        else if (fptUni.Name != "FPT University" || fptUni.Code != "FPTU")
-        {
-            fptUni.Name = "FPT University";
-            fptUni.Code = "FPTU";
-            context.SaveChanges();
-        }
 
-        // 2. Point all existing subjects to FPT University
-        var allSubjects = context.Subjects.ToList();
-        foreach (var subject in allSubjects)
-        {
-            if (subject.UniversityId != fptUni.Id)
-            {
-                subject.UniversityId = fptUni.Id;
-            }
-        }
-        context.SaveChanges();
-
-        // 3. Remove all other universities
-        var otherUnis = context.Universities.Where(u => u.Id != fptUni.Id).ToList();
-        if (otherUnis.Any())
-        {
-            context.Universities.RemoveRange(otherUnis);
-            context.SaveChanges();
-        }
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while seeding FPT university.");
-    }
-}
+ 
 
 
-void SeedDatabase(IHost app)
-{
-    using var scope = app.Services.CreateScope();
-
-    var services = scope.ServiceProvider;
-
-    try
-    {
-        var context = services.GetRequiredService<AppDbContext>();
-        var accountRepository = services.GetRequiredService<IAccountRepository>();
-
-        const string adminEmail = "chickenhuy2005@gmail.com";
-        const string adminUsername = "admin";
-
-        var existingAdminByEmail = context.UserInformations
-            .Include(u => u.Account)
-            .FirstOrDefault(u => u.Email.ToLower() == adminEmail.ToLower());
-
-        var existingAdminByUsername = context.Accounts
-            .FirstOrDefault(a => a.Username.ToLower() == adminUsername.ToLower());
-
-        // Nếu email hoặc username đã tồn tại thì không tạo thêm.
-        if (existingAdminByEmail != null || existingAdminByUsername != null)
-        {
-            return;
-        }
-
-        var adminAccount = new Account
-        {
-            Account_id = Guid.NewGuid(),
-            Username = adminUsername,
-            Password = global::BCrypt.Net.BCrypt.HashPassword("123456"),
-            Role = BusinessObject.Enums.RoleEnum.Admin,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            LastLogin = DateTime.UtcNow
-        };
-
-        var adminInfo = new UserInformation
-        {
-            User_id = Guid.NewGuid(),
-            Account_id = adminAccount.Account_id,
-            Email = adminEmail,
-            Name = "Admin"
-        };
-
-        accountRepository
-            .CreateAccountWithUserInfoAsync(adminAccount, adminInfo)
-            .GetAwaiter()
-            .GetResult();
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while seeding the database.");
-    }
-}
 

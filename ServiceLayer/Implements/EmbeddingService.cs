@@ -49,99 +49,57 @@ namespace ServiceLayer.Implements
                     return (false, null, "Text cannot be empty");
                 }
 
-                var models = new[] { "gemini-embedding-2", "text-embedding-004" };
-                int maxRetries = models.Length;
-                HttpResponseMessage? response = null;
-                string responseContent = string.Empty;
+                var requestUrl =
+                    $"https://generativelanguage.googleapis.com/v1beta/models/" +
+                    $"{activeModel}:embedContent";
 
-                for (int i = 0; i < maxRetries; i++)
+                var requestBody = new
                 {
-                    activeModel = models[i];
-                    var requestUrl =
-                        $"https://generativelanguage.googleapis.com/v1beta/models/" +
-                        $"{activeModel}:embedContent";
-
-                    var requestBody = new
+                    model = $"models/{activeModel}",
+                    content = new
                     {
-                        model = $"models/{activeModel}",
-                        content = new
+                        parts = new[]
                         {
-                            parts = new[]
-                            {
-                                new { text }
-                            }
-                        },
-                        outputDimensionality = 3072
-                    };
-
-                    var json = JsonSerializer.Serialize(requestBody);
-
-                    using var content = new StringContent(
-                        json,
-                        Encoding.UTF8,
-                        "application/json");
-
-                    using var request = new HttpRequestMessage(
-                        HttpMethod.Post,
-                        requestUrl)
-                    {
-                        Content = content
-                    };
-
-                    request.Headers.Add("x-goog-api-key", _apiKey);
-
-                    Console.WriteLine($"Đang gọi Gemini Embedding API... (Mô hình: {activeModel}, Lần {i + 1}/{maxRetries})");
-
-                    try
-                    {
-                        response?.Dispose();
-                        response = null;
-
-                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
-                        response = await _httpClient.SendAsync(request, cts.Token);
-                        responseContent = await response.Content.ReadAsStringAsync();
-
-                        Console.WriteLine(
-                            $"Embedding response: {(int)response.StatusCode} " +
-                            response.StatusCode);
-
-                        if (response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable || 
-                            response.StatusCode == System.Net.HttpStatusCode.TooManyRequests || 
-                            response.StatusCode == System.Net.HttpStatusCode.InternalServerError)
-                        {
-                            if (i < maxRetries - 1)
-                            {
-                                var delay = (int)Math.Pow(2, i) * 1000;
-                                Console.WriteLine($"API ({activeModel}) quá tải hoặc lỗi. Đang chuyển sang mô hình dự phòng sau {delay}ms...");
-                                await Task.Delay(delay);
-                                continue;
-                            }
+                            new { text }
                         }
-                    }
-                    catch (Exception ex) when (ex is HttpRequestException || ex is OperationCanceledException)
-                    {
-                        if (i < maxRetries - 1)
-                        {
-                            var delay = (int)Math.Pow(2, i) * 1000;
-                            Console.WriteLine($"Lỗi mạng/timeout khi gọi {activeModel}: {ex.Message}. Thử mô hình dự phòng sau {delay}ms...");
-                            await Task.Delay(delay);
-                            continue;
-                        }
-                        throw;
-                    }
+                    },
+                    outputDimensionality = 3072 // Note: may not be supported on all embedding models, keeping it as is
+                };
 
-                    break;
-                }
+                var json = JsonSerializer.Serialize(requestBody);
 
-                if (response == null || !response.IsSuccessStatusCode)
+                using var content = new StringContent(
+                    json,
+                    Encoding.UTF8,
+                    "application/json");
+
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    requestUrl)
+                {
+                    Content = content
+                };
+
+                request.Headers.Add("x-goog-api-key", _apiKey);
+
+                Console.WriteLine($"Đang gọi Gemini Embedding API... (Mô hình: {activeModel})");
+
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var response = await _httpClient.SendAsync(request, cts.Token);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Console.WriteLine(
+                    $"Embedding response: {(int)response.StatusCode} " +
+                    response.StatusCode);
+
+                if (!response.IsSuccessStatusCode)
                 {
                     Console.WriteLine(responseContent);
-
                     string userFriendlyError = "Dịch vụ AI Embedding hiện đang bận hoặc quá tải. Vui lòng thử lại sau ít phút.";
                     return (
                         false,
                         null,
-                        $"{userFriendlyError} (Chi tiết: {response?.StatusCode} - {responseContent})");
+                        $"{userFriendlyError} (Chi tiết: {response.StatusCode} - {responseContent})");
                 }
 
                 using var document =

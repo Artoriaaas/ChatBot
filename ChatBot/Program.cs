@@ -23,6 +23,9 @@ builder.Services.AddScoped<IDocumentChunkRepository, DocumentChunkRepository>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IDocumentChunkService, DocumentChunkService>();
 
+// Đăng ký Background Job sao lưu dữ liệu lên Supabase
+builder.Services.AddHostedService<DatabaseBackupService>();
+
 // Register custom services
 var uploadFolderPath = builder.Configuration["UploadFolderPath"] ?? "D:\\Upload";
 
@@ -202,37 +205,27 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
-        Title = "RAG Chatbot API",
+        Title = "Paper AI Core RAG API",
         Version = "v1",
-        Description = "API cho hệ thống quản lý tài liệu và hỏi đáp AI"
+        Description = "API cho lõi RAG xử lý bài báo khoa học"
     });
 });
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint(
-            "/swagger/v1/swagger.json",
-            "RAG Chatbot API v1");
-
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Paper AI API v1");
         c.RoutePrefix = "swagger";
     });
 }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
-app.UseSession();
-
-app.UseAuthentication();
-app.UseAuthorization();
 
 app.MapRazorPages();
 app.MapControllers();

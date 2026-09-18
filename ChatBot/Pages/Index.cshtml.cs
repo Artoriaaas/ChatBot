@@ -7,7 +7,7 @@ namespace ChatBot.Pages
     {
         public IActionResult OnGet()
         {
-            return RedirectToPage("/Auth/Login");
+            return Page();
         }
     }
 }

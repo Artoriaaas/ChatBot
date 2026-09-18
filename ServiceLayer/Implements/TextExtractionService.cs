@@ -77,10 +77,13 @@ namespace ServiceLayer.Implements
                     if (doc.MainDocumentPart != null)
                     {
                         var body = doc.MainDocumentPart.Document.Body;
-                        foreach (var para in body.Descendants<DocumentFormat.OpenXml.Wordprocessing.Paragraph>())
+                        if (body != null)
                         {
-                            var txt = string.Join("", para.Descendants<DocumentFormat.OpenXml.Wordprocessing.Text>().Select(t => t.Text));
-                            text.AppendLine(txt);
+                            foreach (var para in body.Descendants<DocumentFormat.OpenXml.Wordprocessing.Paragraph>())
+                            {
+                                var txt = string.Join("", para.Descendants<DocumentFormat.OpenXml.Wordprocessing.Text>().Select(t => t.Text));
+                                text.AppendLine(txt);
+                            }
                         }
                     }
                 }

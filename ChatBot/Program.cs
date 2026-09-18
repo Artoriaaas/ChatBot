@@ -8,41 +8,8 @@ using ServiceLayer.Interfaces;
 using DataAccessLayer.Repositories;
 using BusinessObject.Entities;
 using BCrypt.Net;
-using DotNetEnv;
 using PayOS;
 using System.IO;
-
-var currentDir = Directory.GetCurrentDirectory();
-string? loadedEnvPath = null;
-
-while (!string.IsNullOrWhiteSpace(currentDir))
-{
-    var envPath = Path.Combine(currentDir, ".env");
-
-    if (File.Exists(envPath))
-    {
-        Env.Load(
-            envPath,
-            new LoadOptions(
-                setEnvVars: true,
-                clobberExistingVars: true,
-                onlyExactPath: true));
-
-        loadedEnvPath = envPath;
-        break;
-    }
-
-    currentDir = Directory.GetParent(currentDir)?.FullName;
-}
-
-if (loadedEnvPath == null)
-{
-    throw new FileNotFoundException(
-        "Không tìm thấy file .env trong project hoặc thư mục cha.");
-}
-
-Console.WriteLine($"[OK] Đã nạp .env tại: {loadedEnvPath}");
-
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -116,9 +83,9 @@ builder.Services.AddScoped<IChatHistoryService, ChatHistoryService>();
 builder.Services.AddScoped<IRagService, RagService>();
 
 // PayOS Configuration
-var payosClientId = Environment.GetEnvironmentVariable("PAYOS_CLIENT_ID") ?? "";
-var payosApiKey = Environment.GetEnvironmentVariable("PAYOS_API_KEY") ?? "";
-var payosChecksumKey = Environment.GetEnvironmentVariable("PAYOS_CHECKSUM_KEY") ?? "";
+var payosClientId = builder.Configuration["PayOS:ClientId"] ?? builder.Configuration["PAYOS_CLIENT_ID"] ?? "";
+var payosApiKey = builder.Configuration["PayOS:ApiKey"] ?? builder.Configuration["PAYOS_API_KEY"] ?? "";
+var payosChecksumKey = builder.Configuration["PayOS:ChecksumKey"] ?? builder.Configuration["PAYOS_CHECKSUM_KEY"] ?? "";
 
 if (!string.IsNullOrWhiteSpace(payosClientId) && payosClientId != "your_client_id_here")
 {

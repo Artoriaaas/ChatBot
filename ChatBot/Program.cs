@@ -56,6 +56,9 @@ builder.Services.AddScoped<IDocumentChunkRepository, DocumentChunkRepository>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IDocumentChunkService, DocumentChunkService>();
 
+// Đăng ký Background Job sao lưu dữ liệu lên Supabase
+builder.Services.AddHostedService<DatabaseBackupService>();
+
 // Register custom services
 var uploadFolderPath = builder.Configuration["UploadFolderPath"] ?? "D:\\Upload";
 
@@ -120,249 +123,36 @@ builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "RequestVerificationToken";
 });
-builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-
-builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    })
-    .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
-    {
-        options.LoginPath = "/Auth/Login";
-        options.AccessDeniedPath = "/Auth/AccessDenied";
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.Cookie.Name = "ChatBot.Auth";
-        options.ForwardDefaultSelector = ctx =>
-        {
-            var path = ctx.Request.Path.Value ?? "";
-            if (path.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase))
-            {
-                return "AdminScheme";
-            }
-            if (path.StartsWith("/Lecturer", StringComparison.OrdinalIgnoreCase))
-            {
-                return "LectureScheme";
-            }
-            if (path.StartsWith("/Student", StringComparison.OrdinalIgnoreCase))
-            {
-                return "StudentScheme";
-            }
-
-            var referer = ctx.Request.Headers["Referer"].ToString();
-            if (!string.IsNullOrEmpty(referer))
-            {
-                try
-                {
-                    var refererUri = new Uri(referer);
-                    var refererPath = refererUri.AbsolutePath;
-                    if (refererPath.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return "AdminScheme";
-                    }
-                    if (refererPath.StartsWith("/Lecturer", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return "LectureScheme";
-                    }
-                    if (refererPath.StartsWith("/Student", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return "StudentScheme";
-                    }
-                }
-                catch
-                {
-                    // Ignore malformed referer headers
-                }
-            }
-
-            return null;
-        };
-    })
-    .AddCookie("AdminScheme", options =>
-    {
-        options.LoginPath = "/Auth/Login";
-        options.AccessDeniedPath = "/Auth/AccessDenied";
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.Cookie.Name = "ChatBot.Auth.Admin";
-    })
-    .AddCookie("LectureScheme", options =>
-    {
-        options.LoginPath = "/Auth/Login";
-        options.AccessDeniedPath = "/Auth/AccessDenied";
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.Cookie.Name = "ChatBot.Auth.Lecture";
-    })
-    .AddCookie("StudentScheme", options =>
-    {
-        options.LoginPath = "/Auth/Login";
-        options.AccessDeniedPath = "/Auth/AccessDenied";
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.Cookie.Name = "ChatBot.Auth.Student";
-    });
-
-builder.Services.AddAuthorization();
-
 builder.Services.AddRazorPages();
-builder.Services.AddSession();
-builder.Services.AddSignalR();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
-        Title = "RAG Chatbot API",
+        Title = "Paper AI Core RAG API",
         Version = "v1",
-        Description = "API cho hệ thống quản lý tài liệu và hỏi đáp AI"
+        Description = "API cho lõi RAG xử lý bài báo khoa học"
     });
 });
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint(
-            "/swagger/v1/swagger.json",
-            "RAG Chatbot API v1");
-
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Paper AI API v1");
         c.RoutePrefix = "swagger";
     });
 }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
-app.UseSession();
-
-app.UseAuthentication();
-app.UseAuthorization();
 
 app.MapRazorPages();
 
-app.MapFallbackToPage("/Auth/Login");
-app.MapHub<ChatBot.Hubs.NotificationHub>("/notificationHub");
-
-//SeedDatabase(app);
-SeedSingleUniversity(app);
 app.Run();
-
-void SeedSingleUniversity(IHost webApp)
-{
-    using var scope = webApp.Services.CreateScope();
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<AppDbContext>();
-        
-        // 1. Ensure FPT University exists
-        var fptUni = context.Universities.FirstOrDefault(u => u.Code == "FPTU" || u.Name == "FPT University" || u.Id == 1);
-        if (fptUni == null)
-        {
-            fptUni = new University
-            {
-                Name = "FPT University",
-                Code = "FPTU"
-            };
-            context.Universities.Add(fptUni);
-            context.SaveChanges();
-        }
-        else if (fptUni.Name != "FPT University" || fptUni.Code != "FPTU")
-        {
-            fptUni.Name = "FPT University";
-            fptUni.Code = "FPTU";
-            context.SaveChanges();
-        }
-
-        // 2. Point all existing subjects to FPT University
-        var allSubjects = context.Subjects.ToList();
-        foreach (var subject in allSubjects)
-        {
-            if (subject.UniversityId != fptUni.Id)
-            {
-                subject.UniversityId = fptUni.Id;
-            }
-        }
-        context.SaveChanges();
-
-        // 3. Remove all other universities
-        var otherUnis = context.Universities.Where(u => u.Id != fptUni.Id).ToList();
-        if (otherUnis.Any())
-        {
-            context.Universities.RemoveRange(otherUnis);
-            context.SaveChanges();
-        }
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while seeding FPT university.");
-    }
-}
-
-
-void SeedDatabase(IHost app)
-{
-    using var scope = app.Services.CreateScope();
-
-    var services = scope.ServiceProvider;
-
-    try
-    {
-        var context = services.GetRequiredService<AppDbContext>();
-        var accountRepository = services.GetRequiredService<IAccountRepository>();
-
-        const string adminEmail = "chickenhuy2005@gmail.com";
-        const string adminUsername = "admin";
-
-        var existingAdminByEmail = context.UserInformations
-            .Include(u => u.Account)
-            .FirstOrDefault(u => u.Email.ToLower() == adminEmail.ToLower());
-
-        var existingAdminByUsername = context.Accounts
-            .FirstOrDefault(a => a.Username.ToLower() == adminUsername.ToLower());
-
-        // Nếu email hoặc username đã tồn tại thì không tạo thêm.
-        if (existingAdminByEmail != null || existingAdminByUsername != null)
-        {
-            return;
-        }
-
-        var adminAccount = new Account
-        {
-            Account_id = Guid.NewGuid(),
-            Username = adminUsername,
-            Password = global::BCrypt.Net.BCrypt.HashPassword("123456"),
-            Role = BusinessObject.Enums.RoleEnum.Admin,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            LastLogin = DateTime.UtcNow
-        };
-
-        var adminInfo = new UserInformation
-        {
-            User_id = Guid.NewGuid(),
-            Account_id = adminAccount.Account_id,
-            Email = adminEmail,
-            Name = "Admin"
-        };
-
-        accountRepository
-            .CreateAccountWithUserInfoAsync(adminAccount, adminInfo)
-            .GetAwaiter()
-            .GetResult();
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while seeding the database.");
-    }
-}
 

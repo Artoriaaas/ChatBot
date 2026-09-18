@@ -65,14 +65,7 @@ Console.WriteLine(
     $"length={geminiApiKey.Length}");
 
 
-if (!string.IsNullOrEmpty(supabaseUrl) && !string.IsNullOrEmpty(supabaseKey))
-{
-    builder.Services.AddScoped<IFileUploadService, SupabaseStorageService>();
-}
-else
-{
-    builder.Services.AddSingleton<IFileUploadService>(new FileUploadService(uploadFolderPath, maxFileSize));
-}
+builder.Services.AddSingleton<IFileUploadService>(new FileUploadService(uploadFolderPath, maxFileSize));
 builder.Services.AddHttpClient<IGrobidService, GrobidService>();
 builder.Services.AddScoped<ITextExtractionService, TextExtractionService>();
 builder.Services.AddScoped<IChunkingService, ChunkingService>();

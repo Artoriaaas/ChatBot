@@ -7,6 +7,13 @@ namespace ServiceLayer.Implements
 {
     public class TextExtractionService : ITextExtractionService
     {
+        private readonly IGrobidService _grobidService;
+
+        public TextExtractionService(IGrobidService grobidService)
+        {
+            _grobidService = grobidService;
+        }
+
         public async Task<(bool success, string? text, string? errorMessage)> ExtractTextAsync(string filePath)
         {
             try
@@ -16,7 +23,7 @@ namespace ServiceLayer.Implements
                 var extension = Path.GetExtension(filePath).ToLower();
                 return extension switch
                 {
-                    ".pdf" => ExtractFromPdf(filePath),
+                    ".pdf" => await ExtractFromPdfAsync(filePath),
                     ".docx" => ExtractFromDocx(filePath),
                     ".pptx" => ExtractFromPptx(filePath),
                     _ => (false, null, $"Unsupported format: {extension}")
@@ -27,26 +34,37 @@ namespace ServiceLayer.Implements
                 return (false, null, $"Extraction failed: {ex.Message}");
             }
         }
-        private (bool, string?, string?) ExtractFromPdf(string filePath)
+        
+        private async Task<(bool, string?, string?)> ExtractFromPdfAsync(string filePath)
         {
             try
             {
-                var text = new StringBuilder();
-                using (var pdfReader = new iText.Kernel.Pdf.PdfReader(filePath))
-                using (var pdfDoc = new iText.Kernel.Pdf.PdfDocument(pdfReader))
-                {
-                    for (int i = 1; i <= pdfDoc.GetNumberOfPages(); i++)
-                    {
-                        var page = pdfDoc.GetPage(i);
-                        var content = iText.Kernel.Pdf.Canvas.Parser.PdfTextExtractor.GetTextFromPage(page);
-                        text.AppendLine(content);
-                    }
-                }
-                return text.Length == 0 ? (false, null, "No text") : (true, text.ToString(), null);
+                using var stream = File.OpenRead(filePath);
+                var text = await _grobidService.ProcessPdfAsync(stream);
+                return string.IsNullOrWhiteSpace(text) ? (false, null, "No text") : (true, text, null);
             }
             catch (Exception ex)
             {
-                return (false, null, $"PDF: {ex.Message}");
+                // Fallback to iText7 if GROBID fails or is not running
+                try
+                {
+                    var text = new StringBuilder();
+                    using (var pdfReader = new iText.Kernel.Pdf.PdfReader(filePath))
+                    using (var pdfDoc = new iText.Kernel.Pdf.PdfDocument(pdfReader))
+                    {
+                        for (int i = 1; i <= pdfDoc.GetNumberOfPages(); i++)
+                        {
+                            var page = pdfDoc.GetPage(i);
+                            var content = iText.Kernel.Pdf.Canvas.Parser.PdfTextExtractor.GetTextFromPage(page);
+                            text.AppendLine(content);
+                        }
+                    }
+                    return text.Length == 0 ? (false, null, "No text") : (true, text.ToString(), null);
+                }
+                catch (Exception fallbackEx)
+                {
+                    return (false, null, $"PDF (GROBID & iText7 failed): {ex.Message} | {fallbackEx.Message}");
+                }
             }
         }
         private (bool, string?, string?) ExtractFromDocx(string filePath)

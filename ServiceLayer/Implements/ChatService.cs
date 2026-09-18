@@ -12,7 +12,7 @@ namespace ServiceLayer.Implements
         private readonly string _apiKey;
         private readonly HttpClient _httpClient;
 
-        private const string ModelName = "gemini-3.5-flash";
+        private const string ModelName = "gemini-1.5-flash";
 
         public ChatService(string apiKey)
         {
@@ -46,7 +46,7 @@ namespace ServiceLayer.Implements
             string? errorMessage)>
         GenerateAnswerAsync(string prompt)
         {
-            string activeModel = "gemini-3.5-flash";
+            string activeModel = "gemini-1.5-flash";
             try
             {
                 if (string.IsNullOrWhiteSpace(prompt))
@@ -80,7 +80,7 @@ namespace ServiceLayer.Implements
 
                 var json = JsonSerializer.Serialize(requestBody);
 
-                var models = new[] { "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.0-flash" };
+                var models = new[] { "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro" };
                 int maxRetries = models.Length;
                 HttpResponseMessage? response = null;
                 string responseContent = string.Empty;

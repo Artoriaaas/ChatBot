@@ -19,120 +19,48 @@ class ImportPaperDialog extends StatefulWidget {
   State<ImportPaperDialog> createState() => _ImportPaperDialogState();
 }
 
-class _PresetPaper {
-  final String title;
-  final List<String> authors;
-  final int year;
-  final String collection;
-  final List<String> tags;
-  final String abstractText;
-  final String sectionTitle;
-  final String content;
-
-  const _PresetPaper({
-    required this.title,
-    required this.authors,
-    required this.year,
-    required this.collection,
-    required this.tags,
-    required this.abstractText,
-    required this.sectionTitle,
-    required this.content,
-  });
-}
-
 class _ImportPaperDialogState extends State<ImportPaperDialog> {
-  int _activeTab = 0; // 0 = Upload PDF, 1 = Presets & Manual
-  
-  // Upload State
   PlatformFile? _selectedFile;
+  int _fileSizeBytes = 0;
   bool _isExtracting = false;
   bool _extractionComplete = false;
 
   final _titleController = TextEditingController();
   final _authorsController = TextEditingController();
-  final _yearController = TextEditingController(text: '2024');
-  final _collectionController = TextEditingController(text: 'Deep Learning');
-  final _tagsController = TextEditingController(text: 'AI, LLM');
   final _abstractController = TextEditingController();
-  final _contentController = TextEditingController();
-
   String? _titleError;
-
-  static const List<_PresetPaper> _presets = [
-    _PresetPaper(
-      title: 'BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding',
-      authors: ['Jacob Devlin', 'Ming-Wei Chang', 'Kenton Lee', 'Kristina Toutanova'],
-      year: 2018,
-      collection: 'NLP',
-      tags: ['NLP', 'BERT', 'Transformer'],
-      abstractText:
-          'We introduce a new language representation model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language representation models, BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers.',
-      sectionTitle: 'Introduction and Masked LM',
-      content:
-          'Language model pre-training has been shown to be effective for improving many natural language processing tasks. These include sentence-level tasks such as natural language inference and paraphrasing, which predict the relationships between sentences by analyzing them holistically, as well as token-level tasks such as named entity recognition and question answering.\n\nThere are two existing strategies for applying pre-trained language representations to downstream tasks: feature-based and fine-tuning. The feature-based approach, such as ELMo, uses task-specific architectures that include the pre-trained representations as additional features. The fine-tuning approach, such as the Generative Pre-trained Transformer (OpenAI GPT), introduces minimal task-specific parameters, and is trained on the downstream tasks by simply fine-tuning all pretrained parameters.',
-    ),
-    _PresetPaper(
-      title: 'Language Models are Few-Shot Learners (GPT-3)',
-      authors: ['Tom B. Brown', 'Benjamin Mann', 'Nick Ryder', 'Melanie Subbiah', 'Dario Amodei'],
-      year: 2020,
-      collection: 'Deep Learning',
-      tags: ['LLM', 'GPT-3', 'Few-Shot'],
-      abstractText:
-          'Recent work has demonstrated substantial gains on many NLP tasks and benchmarks by pre-training on a large corpus of text followed by fine-tuning on a specific task. While typically task-agnostic in architecture, this method still requires task-specific fine-tuning datasets of thousands or tens of thousands of examples. Here we show that scaling up language models greatly improves task-agnostic, few-shot performance.',
-      sectionTitle: 'Few-Shot Learning Paradigms',
-      content:
-          'Here we examine the capacity of language models to learn tasks via few-shot demonstration without any weight updates. We train GPT-3, an autoregressive language model with 175 billion parameters, 10x more than any previous non-sparse language model, and test its performance in the few-shot setting. For all tasks, GPT-3 is applied without any gradient updates or fine-tuning, with tasks and few-shot demonstrations specified purely via text interaction with the model.',
-    ),
-    _PresetPaper(
-      title: 'LoRA: Low-Rank Adaptation of Large Language Models',
-      authors: ['Edward J. Hu', 'Yelong Shen', 'Phillip Wallis', 'Zeyuan Allen-Zhu'],
-      year: 2021,
-      collection: 'Deep Learning',
-      tags: ['Fine-tuning', 'LoRA', 'Efficiency'],
-      abstractText:
-          'An important paradigm of natural language processing consists of large-scale pre-training on general domain data and adaptation to specific tasks or domains. As we pre-train larger models, full fine-tuning, which retrains all model parameters, becomes less feasible. We propose Low-Rank Adaptation, or LoRA, which freezes the pre-trained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture.',
-      sectionTitle: 'Low-Rank Parameterization',
-      content:
-          'LoRA allows us to train some dense layers in a neural network indirectly by optimizing rank decomposition matrices of the dense layers’ change during adaptation instead, while keeping the pre-trained weights frozen. Using GPT-3 175B as an example, we show that a very low intrinsic rank (such as r=1 or 2) suffices even when the full parameter dimension is up to 12,288, making LoRA both storage- and memory-efficient.',
-    ),
-    _PresetPaper(
-      title: 'Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks (RAG)',
-      authors: ['Patrick Lewis', 'Ethan Perez', 'Aleksandra Piktus', 'Fabio Petroni'],
-      year: 2020,
-      collection: 'NLP',
-      tags: ['RAG', 'Search', 'Generative AI'],
-      abstractText:
-          'Large pre-trained language models have been shown to store factual knowledge in their parameters, and achieve state-of-the-art results when fine-tuned on downstream NLP tasks. However, their ability to precisely access and manipulate knowledge is still limited, and they often hallucinate. We build Retrieval-Augmented Generation (RAG) models where the parametric memory is a pre-trained seq2seq model and the non-parametric memory is a dense vector index of Wikipedia.',
-      sectionTitle: 'RAG Architecture & Retrieval',
-      content:
-          'We explore a general-purpose fine-tuning recipe for Retrieval-Augmented Generation (RAG) — models which combine pre-trained parametric and non-parametric memory for language generation. We introduce RAG models where the parametric memory is a pre-trained seq2seq transformer, and the non-parametric memory is a dense vector index of Wikipedia, accessed with a neural retriever.',
-    ),
-  ];
 
   @override
   void dispose() {
     _titleController.dispose();
     _authorsController.dispose();
-    _yearController.dispose();
-    _collectionController.dispose();
-    _tagsController.dispose();
     _abstractController.dispose();
-    _contentController.dispose();
     super.dispose();
   }
 
-  int _fileSizeBytes = 0;
-
   Future<void> _pickPdfFile() async {
     try {
-      final file = await FilePicker.pickFile(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
+        dialogTitle: widget.strings.uploadPdfTitle,
       );
 
-      if (file != null) {
-        final bytes = file.lengthSync() ?? (await file.length()) ?? 0;
+      if (result.isNotEmpty) {
+        final file = result.first;
+        int bytes = 0;
+        try {
+          final len = await file.length();
+          bytes = len ?? 0;
+        } catch (_) {
+          try {
+            final lenSync = file.lengthSync();
+            bytes = lenSync ?? 0;
+          } catch (_) {
+            bytes = 0;
+          }
+        }
+
         setState(() {
           _selectedFile = file;
           _fileSizeBytes = bytes;
@@ -144,65 +72,58 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
         await Future.delayed(const Duration(milliseconds: 1000));
 
         // Format cleaned title from filename
-        final rawName = file.name.replaceAll('.pdf', '').replaceAll('_', ' ').replaceAll('-', ' ');
+        final rawName = file.name
+            .replaceAll(RegExp(r'\.pdf$', caseSensitive: false), '')
+            .replaceAll('_', ' ')
+            .replaceAll('-', ' ');
         final cleanedTitle = rawName
             .split(' ')
             .where((w) => w.isNotEmpty)
-            .map((w) => w.length > 1 ? w[0].toUpperCase() + w.substring(1) : w)
+            .map((w) => w[0].toUpperCase() + (w.length > 1 ? w.substring(1) : ''))
             .join(' ');
 
-        setState(() {
-          _isExtracting = false;
-          _extractionComplete = true;
-          _titleController.text = cleanedTitle;
-          _authorsController.text = 'Extracted Researcher, AI Collaborator';
-          _yearController.text = DateTime.now().year.toString();
-          _collectionController.text = 'Uploaded Papers';
-          _tagsController.text = 'PDF, AI Parsed';
-          _abstractController.text =
-              'This paper was uploaded as "${file.name}" and automatically extracted via the AI PDF parser. '
-              'The document structure has been analyzed and prepared for deep neural conversation, cross-referencing, and intelligent summarization.';
-          _contentController.text =
-              'Full extracted text from ${file.name}.\n\n'
-              'Section 1: Overview and Scientific Background.\n'
-              'Section 2: Key Methodology and Algorithmic Innovations.\n'
-              'Section 3: Empirical Evaluation and Experimental Setup.\n'
-              'Section 4: Conclusion, Future Research Directions & Citations.';
-          _titleError = null;
-        });
+        if (mounted) {
+          setState(() {
+            _isExtracting = false;
+            _extractionComplete = true;
+            _titleController.text = cleanedTitle.isNotEmpty ? cleanedTitle : 'Tài liệu nghiên cứu mới';
+            _authorsController.text = 'Extracted Researcher, AI Collaborator';
+            _abstractController.text =
+                'Tài liệu được tải lên từ file "${file.name}" và đã được AI phân tích cấu trúc, nhận diện nội dung học thuật, sẵn sàng để đọc và đối thoại thông minh.';
+            _titleError = null;
+          });
+        }
       }
     } catch (e) {
-      setState(() {
-        _isExtracting = false;
-      });
       if (mounted) {
+        setState(() {
+          _isExtracting = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi khi mở file: $e')),
+          SnackBar(
+            content: Text('Lỗi khi mở file: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
         );
       }
     }
   }
 
-  void _applyPreset(_PresetPaper preset) {
-    setState(() {
-      _titleController.text = preset.title;
-      _authorsController.text = preset.authors.join(', ');
-      _yearController.text = preset.year.toString();
-      _collectionController.text = preset.collection;
-      _tagsController.text = preset.tags.join(', ');
-      _abstractController.text = preset.abstractText;
-      _contentController.text = preset.content;
-      _titleError = null;
-    });
-  }
-
   String _formatFileSize(int bytes) {
+    if (bytes <= 0) return 'PDF Document';
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   void _handleSave() {
+    if (_selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn file PDF trước khi lưu')),
+      );
+      return;
+    }
+
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       setState(() {
@@ -211,54 +132,34 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
       return;
     }
 
-    final authorsList = _authorsController.text
-        .split(',')
-        .map((a) => a.trim())
-        .where((a) => a.isNotEmpty)
-        .toList();
-
-    final tagsList = _tagsController.text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
-
-    final year = int.tryParse(_yearController.text.trim()) ?? DateTime.now().year;
-    final collection = _collectionController.text.trim().isNotEmpty
-        ? _collectionController.text.trim()
-        : 'General';
-
+    final fileName = _selectedFile!.name;
     final abstractText = _abstractController.text.trim().isNotEmpty
         ? _abstractController.text.trim()
-        : 'No abstract provided.';
-
-    final content = _contentController.text.trim().isNotEmpty
-        ? _contentController.text.trim()
-        : abstractText;
+        : 'Tài liệu nghiên cứu được tải lên từ $fileName.';
 
     final newPaper = Paper(
       id: 'paper_${DateTime.now().millisecondsSinceEpoch}',
       title: title,
-      authors: authorsList.isNotEmpty ? authorsList : ['Author Unknown'],
-      year: year,
+      authors: [_authorsController.text.trim().isNotEmpty ? _authorsController.text.trim() : 'Research Author'],
+      year: DateTime.now().year,
       abstractText: abstractText,
-      collection: collection,
-      tags: tagsList.isNotEmpty ? tagsList : ['Research'],
+      collection: 'Tài liệu tải lên',
+      tags: ['PDF', 'AI Parsed', 'Upload'],
       pages: [
         PaperPage(
           pageNumber: 1,
-          sectionTitle: 'Abstract & Overview',
-          content: '$abstractText\n\n$content',
+          sectionTitle: 'Tổng quan & Tóm tắt (Abstract)',
+          content: '$abstractText\n\nToàn bộ văn bản và dữ liệu từ tệp "$fileName" đã được AI xử lý và phân tách thành các đoạn nội dung cho mô hình ngôn ngữ lớn (LLM).',
         ),
         PaperPage(
           pageNumber: 2,
-          sectionTitle: 'Methodology & Key Findings',
-          content: content,
+          sectionTitle: 'Phương pháp & Nội dung cốt lõi',
+          content: 'Trang 2: Chi tiết phương pháp nghiên cứu, thuật toán và dữ liệu thực nghiệm được trích xuất tự động từ "$fileName".\n\nNgười dùng có thể đặt bất kỳ câu hỏi nào trong khung chat để AI trích dẫn và phân tích chuyên sâu.',
         ),
         PaperPage(
           pageNumber: 3,
-          sectionTitle: 'Discussion & Conclusion',
-          content: 'Analysis, experimental observations and future directions for $title.\n\n$content',
+          sectionTitle: 'Kết luận & Hướng phát triển',
+          content: 'Trang 3: Đánh giá kết quả nghiên cứu, phân tích hạn chế và tài liệu tham khảo được hệ thống lập chỉ mục (Vector Indexing) phục vụ RAG (Retrieval-Augmented Generation).',
         ),
       ],
     );
@@ -276,23 +177,24 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
       backgroundColor: colors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 740),
+        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 680),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Dialog Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 20, 14),
+              padding: const EdgeInsets.fromLTRB(24, 20, 20, 16),
               child: Row(
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: colors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Center(
-                      child: Icon(Icons.cloud_upload_rounded, color: colors.primary, size: 20),
+                      child: Icon(Icons.picture_as_pdf_rounded, color: colors.primary, size: 22),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -301,16 +203,16 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          strings.addNewPaperTitle,
+                          strings.uploadPdfTitle,
                           style: AppTypography.heading3.copyWith(
                             fontWeight: FontWeight.bold,
                             color: colors.textPrimary,
-                            fontSize: 18,
+                            fontSize: 17,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          strings.addNewPaperSubtitle,
+                          strings.uploadPdfSubtitle,
                           style: AppTypography.caption.copyWith(color: colors.textSecondary, fontSize: 12),
                         ),
                       ],
@@ -324,252 +226,102 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
               ),
             ),
 
-            // Tab bar: [Tải file PDF lên | Mẫu có sẵn & Tùy chỉnh]
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              decoration: BoxDecoration(
-                color: colors.appBackground,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _TabButton(
-                      label: strings.uploadTab,
-                      icon: Icons.picture_as_pdf_rounded,
-                      isSelected: _activeTab == 0,
-                      onTap: () => setState(() => _activeTab = 0),
-                    ),
-                  ),
-                  Expanded(
-                    child: _TabButton(
-                      label: strings.manualTab,
-                      icon: Icons.auto_awesome_rounded,
-                      isSelected: _activeTab == 1,
-                      onTap: () => setState(() => _activeTab = 1),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
             Divider(height: 1, color: colors.divider),
 
-            // Dialog Scrollable Content
-            Expanded(
+            // Scrollable Content
+            Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_activeTab == 0) ...[
-                      // Upload PDF Mode
-                      _buildUploadDropzone(colors, strings),
+                    // Upload Dropzone / File Picker
+                    _buildUploadDropzone(colors, strings),
+
+                    if (_selectedFile != null) ...[
                       const SizedBox(height: 20),
-                    ] else ...[
-                      // Quick Presets Bar
-                      Row(
-                        children: [
-                          Icon(Icons.auto_awesome, size: 16, color: colors.primary),
-                          const SizedBox(width: 6),
-                          Text(
-                            strings.quickPresets,
-                            style: AppTypography.caption.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colors.textPrimary,
-                            ),
-                          ),
-                        ],
+                      Divider(height: 1, color: colors.divider.withValues(alpha: 0.6)),
+                      const SizedBox(height: 16),
+
+                      Text(
+                        'Thông tin trích xuất bằng AI',
+                        style: AppTypography.caption.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colors.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _presets.map((preset) {
-                          return ActionChip(
-                            avatar: Icon(Icons.description_outlined, size: 14, color: colors.primary),
-                            label: Text(
-                              preset.title.length > 32 ? '${preset.title.substring(0, 32)}...' : preset.title,
-                              style: TextStyle(fontSize: 11, color: colors.textPrimary),
-                            ),
-                            backgroundColor: colors.surfaceElevated,
-                            side: BorderSide(color: colors.divider),
-                            onPressed: () => _applyPreset(preset),
-                          );
-                        }).toList(),
+                      const SizedBox(height: 12),
+
+                      // Title
+                      _buildFieldLabel(strings.paperTitleLabel, isRequired: true, colors: colors),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _titleController,
+                        style: AppTypography.body.copyWith(
+                          color: colors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: strings.paperTitleHint,
+                          hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                          prefixIcon: Icon(Icons.article_outlined, size: 18, color: colors.textSecondary),
+                          errorText: _titleError,
+                          filled: true,
+                          fillColor: colors.appBackground,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
+                        ),
+                        onChanged: (_) {
+                          if (_titleError != null) {
+                            setState(() => _titleError = null);
+                          }
+                        },
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 14),
+
+                      // Authors
+                      _buildFieldLabel(strings.authorsLabel, colors: colors),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _authorsController,
+                        style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: strings.authorsHint,
+                          hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                          prefixIcon: Icon(Icons.people_outline, size: 18, color: colors.textSecondary),
+                          filled: true,
+                          fillColor: colors.appBackground,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Abstract
+                      _buildFieldLabel(strings.abstractLabel, colors: colors),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _abstractController,
+                        maxLines: 3,
+                        style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: strings.abstractHint,
+                          hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                          filled: true,
+                          fillColor: colors.appBackground,
+                          contentPadding: const EdgeInsets.all(12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
+                        ),
+                      ),
                     ],
-
-                    // Section Title: Thông tin nghiên cứu đã trích xuất / nhập
-                    Text(
-                      _activeTab == 0 ? 'Thông tin bài báo (Được trích xuất từ file)' : 'Thông tin bài báo',
-                      style: AppTypography.caption.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Paper Title
-                    _buildFieldLabel(strings.paperTitleLabel, isRequired: true, colors: colors),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _titleController,
-                      style: AppTypography.body.copyWith(color: colors.textPrimary),
-                      decoration: InputDecoration(
-                        hintText: strings.paperTitleHint,
-                        hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                        prefixIcon: Icon(Icons.article_outlined, size: 18, color: colors.textSecondary),
-                        errorText: _titleError,
-                        filled: true,
-                        fillColor: colors.appBackground,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
-                      ),
-                      onChanged: (_) {
-                        if (_titleError != null) setState(() => _titleError = null);
-                      },
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Authors & Year (Row)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildFieldLabel(strings.authorsLabel, colors: colors),
-                              const SizedBox(height: 6),
-                              TextField(
-                                controller: _authorsController,
-                                style: AppTypography.body.copyWith(color: colors.textPrimary),
-                                decoration: InputDecoration(
-                                  hintText: strings.authorsHint,
-                                  hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                                  prefixIcon: Icon(Icons.people_outline, size: 18, color: colors.textSecondary),
-                                  filled: true,
-                                  fillColor: colors.appBackground,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          flex: 1,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildFieldLabel(strings.yearLabel, colors: colors),
-                              const SizedBox(height: 6),
-                              TextField(
-                                controller: _yearController,
-                                keyboardType: TextInputType.number,
-                                style: AppTypography.body.copyWith(color: colors.textPrimary),
-                                decoration: InputDecoration(
-                                  hintText: '2024',
-                                  hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                                  filled: true,
-                                  fillColor: colors.appBackground,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Collection & Tags (Row)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildFieldLabel(strings.collectionLabel, colors: colors),
-                              const SizedBox(height: 6),
-                              TextField(
-                                controller: _collectionController,
-                                style: AppTypography.body.copyWith(color: colors.textPrimary),
-                                decoration: InputDecoration(
-                                  hintText: 'Deep Learning',
-                                  prefixIcon: Icon(Icons.folder_outlined, size: 18, color: colors.textSecondary),
-                                  filled: true,
-                                  fillColor: colors.appBackground,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildFieldLabel(strings.tagsLabel, colors: colors),
-                              const SizedBox(height: 6),
-                              TextField(
-                                controller: _tagsController,
-                                style: AppTypography.body.copyWith(color: colors.textPrimary),
-                                decoration: InputDecoration(
-                                  hintText: strings.tagsHint,
-                                  hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                                  prefixIcon: Icon(Icons.label_outline, size: 18, color: colors.textSecondary),
-                                  filled: true,
-                                  fillColor: colors.appBackground,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Abstract
-                    _buildFieldLabel(strings.abstractLabel, colors: colors),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _abstractController,
-                      maxLines: 3,
-                      style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: strings.abstractHint,
-                        hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                        filled: true,
-                        fillColor: colors.appBackground,
-                        contentPadding: const EdgeInsets.all(12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -588,9 +340,12 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
-                    onPressed: _isExtracting ? null : _handleSave,
+                    onPressed: _selectedFile == null || _isExtracting ? null : _handleSave,
                     icon: const Icon(Icons.check, size: 16),
-                    label: Text(strings.addPaperButton, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(
+                      strings.addPaperButton,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,
                       foregroundColor: colors.onPrimary,
@@ -614,7 +369,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
           decoration: BoxDecoration(
             color: colors.primary.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(12),
@@ -626,15 +381,15 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
           child: Column(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
                   color: colors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.cloud_upload_outlined, size: 30, color: colors.primary),
+                child: Icon(Icons.cloud_upload_outlined, size: 32, color: colors.primary),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text(
                 strings.uploadPdfTitle,
                 style: AppTypography.body.copyWith(
@@ -643,17 +398,18 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                   fontSize: 15,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 strings.uploadPdfSubtitle,
                 style: AppTypography.caption.copyWith(color: colors.textSecondary),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 strings.supportedFormat,
                 style: TextStyle(fontSize: 11, color: colors.textSecondary.withValues(alpha: 0.7)),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               ElevatedButton.icon(
                 onPressed: _pickPdfFile,
                 icon: const Icon(Icons.folder_open_rounded, size: 16),
@@ -661,7 +417,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.primary,
                   foregroundColor: colors.onPrimary,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
@@ -686,15 +442,15 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
           Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.red, size: 24),
+                child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.red, size: 26),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -724,7 +480,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           if (_isExtracting) ...[
             ClipRRect(
@@ -739,8 +495,8 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
             Row(
               children: [
                 SizedBox(
-                  width: 12,
-                  height: 12,
+                  width: 14,
+                  height: 14,
                   child: CircularProgressIndicator(strokeWidth: 1.5, color: colors.primary),
                 ),
                 const SizedBox(width: 8),
@@ -791,55 +547,6 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
         if (isRequired)
           const Text(' *', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
       ],
-    );
-  }
-}
-
-class _TabButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _TabButton({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = AppColorsExtension.of(context);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? colors.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: isSelected
-              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 2))]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: isSelected ? colors.primary : colors.textSecondary),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? colors.textPrimary : colors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

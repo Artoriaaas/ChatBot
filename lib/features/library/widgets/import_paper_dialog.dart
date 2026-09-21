@@ -570,26 +570,6 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
                       ),
                     ),
-                    const SizedBox(height: 14),
-
-                    // Detailed Content
-                    _buildFieldLabel(strings.paperContentLabel, colors: colors),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _contentController,
-                      maxLines: 3,
-                      style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: strings.paperContentHint,
-                        hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                        filled: true,
-                        fillColor: colors.appBackground,
-                        contentPadding: const EdgeInsets.all(12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
-                      ),
-                    ),
                   ],
                 ),
               ),

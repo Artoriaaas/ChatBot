@@ -227,6 +227,7 @@ class AppStrings {
   String get authorsHint => isVi ? 'Phân cách bằng dấu phẩy (vd: Jacob Devlin, Ming-Wei Chang)' : 'Separated by comma (e.g., Jacob Devlin, Ming-Wei Chang)';
   String get yearLabel => isVi ? 'Năm xuất bản' : 'Publication Year';
   String get collectionLabel => isVi ? 'Bộ sưu tập' : 'Collection';
+  String get collectionHint => isVi ? 'vd: Deep Learning, Computer Vision...' : 'e.g., Deep Learning, Computer Vision...';
   String get tagsLabel => isVi ? 'Thẻ (Tags)' : 'Tags';
   String get tagsHint => isVi ? 'vd: NLP, Transformer, Language Model' : 'e.g., NLP, Transformer, Language Model';
   String get abstractLabel => isVi ? 'Tóm tắt bài báo (Abstract)' : 'Abstract';

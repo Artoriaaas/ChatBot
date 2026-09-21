@@ -27,6 +27,9 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
 
   final _titleController = TextEditingController();
   final _authorsController = TextEditingController();
+  final _yearController = TextEditingController(text: '2024');
+  final _collectionController = TextEditingController(text: 'Deep Learning');
+  final _tagsController = TextEditingController(text: 'AI, LLM');
   final _abstractController = TextEditingController();
   String? _titleError;
 
@@ -34,6 +37,9 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
   void dispose() {
     _titleController.dispose();
     _authorsController.dispose();
+    _yearController.dispose();
+    _collectionController.dispose();
+    _tagsController.dispose();
     _abstractController.dispose();
     super.dispose();
   }
@@ -88,8 +94,11 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
             _extractionComplete = true;
             _titleController.text = cleanedTitle.isNotEmpty ? cleanedTitle : 'Tài liệu nghiên cứu mới';
             _authorsController.text = 'Extracted Researcher, AI Collaborator';
+            _yearController.text = DateTime.now().year.toString();
+            _collectionController.text = 'Tài liệu tải lên';
+            _tagsController.text = 'PDF, AI Parsed';
             _abstractController.text =
-                'Tài liệu được tải lên từ file "${file.name}" và đã được AI phân tích cấu trúc, nhận diện nội dung học thuật, sẵn sàng để đọc và đối thoại thông minh.';
+                'Tài liệu được tải lên từ file "${file.name}" và đã được AI trích xuất nội dung, phân tích cấu trúc học thuật, sẵn sàng để đọc và đối thoại thông minh.';
             _titleError = null;
           });
         }
@@ -117,13 +126,6 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
   }
 
   void _handleSave() {
-    if (_selectedFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn file PDF trước khi lưu')),
-      );
-      return;
-    }
-
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       setState(() {
@@ -132,19 +134,36 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
       return;
     }
 
-    final fileName = _selectedFile!.name;
+    final authorsList = _authorsController.text
+        .split(',')
+        .map((a) => a.trim())
+        .where((a) => a.isNotEmpty)
+        .toList();
+
+    final tagsList = _tagsController.text
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+
+    final year = int.tryParse(_yearController.text.trim()) ?? DateTime.now().year;
+    final collection = _collectionController.text.trim().isNotEmpty
+        ? _collectionController.text.trim()
+        : 'General';
+
+    final fileName = _selectedFile?.name ?? '$title.pdf';
     final abstractText = _abstractController.text.trim().isNotEmpty
         ? _abstractController.text.trim()
-        : 'Tài liệu nghiên cứu được tải lên từ $fileName.';
+        : 'Tài liệu nghiên cứu: $title.';
 
     final newPaper = Paper(
       id: 'paper_${DateTime.now().millisecondsSinceEpoch}',
       title: title,
-      authors: [_authorsController.text.trim().isNotEmpty ? _authorsController.text.trim() : 'Research Author'],
-      year: DateTime.now().year,
+      authors: authorsList.isNotEmpty ? authorsList : ['Research Author'],
+      year: year,
       abstractText: abstractText,
-      collection: 'Tài liệu tải lên',
-      tags: ['PDF', 'AI Parsed', 'Upload'],
+      collection: collection,
+      tags: tagsList.isNotEmpty ? tagsList : ['Research'],
       pages: [
         PaperPage(
           pageNumber: 1,
@@ -154,7 +173,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
         PaperPage(
           pageNumber: 2,
           sectionTitle: 'Phương pháp & Nội dung cốt lõi',
-          content: 'Trang 2: Chi tiết phương pháp nghiên cứu, thuật toán và dữ liệu thực nghiệm được trích xuất tự động từ "$fileName".\n\nNgười dùng có thể đặt bất kỳ câu hỏi nào trong khung chat để AI trích dẫn và phân tích chuyên sâu.',
+          content: 'Trang 2: Chi tiết phương pháp nghiên cứu, thuật toán và dữ liệu thực nghiệm được trích xuất từ "$fileName".\n\nNgười dùng có thể đặt bất kỳ câu hỏi nào trong khung chat để AI trích dẫn và phân tích chuyên sâu.',
         ),
         PaperPage(
           pageNumber: 3,
@@ -177,7 +196,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
       backgroundColor: colors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 680),
+        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 760),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -231,97 +250,197 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
             // Scrollable Content
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Upload Dropzone / File Picker
+                    // PDF Upload Dropzone / File Picker Card
                     _buildUploadDropzone(colors, strings),
+                    const SizedBox(height: 18),
 
-                    if (_selectedFile != null) ...[
-                      const SizedBox(height: 20),
-                      Divider(height: 1, color: colors.divider.withValues(alpha: 0.6)),
-                      const SizedBox(height: 16),
-
-                      Text(
-                        'Thông tin trích xuất bằng AI',
-                        style: AppTypography.caption.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colors.textSecondary,
-                          fontSize: 12,
+                    // Section: Thông tin bài báo
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: colors.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedFile != null
+                              ? 'Thông tin trích xuất từ file (Có thể chỉnh sửa)'
+                              : 'Thông tin bài báo',
+                          style: AppTypography.caption.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colors.textSecondary,
+                            fontSize: 12,
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Title Field
+                    _buildFieldLabel(strings.paperTitleLabel, isRequired: true, colors: colors),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _titleController,
+                      style: AppTypography.body.copyWith(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
                       ),
-                      const SizedBox(height: 12),
-
-                      // Title
-                      _buildFieldLabel(strings.paperTitleLabel, isRequired: true, colors: colors),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _titleController,
-                        style: AppTypography.body.copyWith(
-                          color: colors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: strings.paperTitleHint,
-                          hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                          prefixIcon: Icon(Icons.article_outlined, size: 18, color: colors.textSecondary),
-                          errorText: _titleError,
-                          filled: true,
-                          fillColor: colors.appBackground,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
-                        ),
-                        onChanged: (_) {
-                          if (_titleError != null) {
-                            setState(() => _titleError = null);
-                          }
-                        },
+                      decoration: InputDecoration(
+                        hintText: strings.paperTitleHint,
+                        hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                        prefixIcon: Icon(Icons.article_outlined, size: 18, color: colors.textSecondary),
+                        errorText: _titleError,
+                        filled: true,
+                        fillColor: colors.appBackground,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
                       ),
-                      const SizedBox(height: 14),
+                      onChanged: (_) {
+                        if (_titleError != null) {
+                          setState(() => _titleError = null);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 14),
 
-                      // Authors
-                      _buildFieldLabel(strings.authorsLabel, colors: colors),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _authorsController,
-                        style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: strings.authorsHint,
-                          hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                          prefixIcon: Icon(Icons.people_outline, size: 18, color: colors.textSecondary),
-                          filled: true,
-                          fillColor: colors.appBackground,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
+                    // Authors & Year Row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel(strings.authorsLabel, colors: colors),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _authorsController,
+                                style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: strings.authorsHint,
+                                  hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                                  prefixIcon: Icon(Icons.people_outline, size: 18, color: colors.textSecondary),
+                                  filled: true,
+                                  fillColor: colors.appBackground,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel(strings.yearLabel, colors: colors),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _yearController,
+                                keyboardType: TextInputType.number,
+                                style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: '2024',
+                                  hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                                  filled: true,
+                                  fillColor: colors.appBackground,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
 
-                      // Abstract
-                      _buildFieldLabel(strings.abstractLabel, colors: colors),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _abstractController,
-                        maxLines: 3,
-                        style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: strings.abstractHint,
-                          hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                          filled: true,
-                          fillColor: colors.appBackground,
-                          contentPadding: const EdgeInsets.all(12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
+                    // Collection & Tags Row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel(strings.collectionLabel, colors: colors),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _collectionController,
+                                style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: strings.collectionHint,
+                                  hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                                  prefixIcon: Icon(Icons.folder_outlined, size: 18, color: colors.textSecondary),
+                                  filled: true,
+                                  fillColor: colors.appBackground,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFieldLabel(strings.tagsLabel, colors: colors),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: _tagsController,
+                                style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: strings.tagsHint,
+                                  hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                                  prefixIcon: Icon(Icons.label_outline, size: 18, color: colors.textSecondary),
+                                  filled: true,
+                                  fillColor: colors.appBackground,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Abstract Field
+                    _buildFieldLabel(strings.abstractLabel, colors: colors),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _abstractController,
+                      maxLines: 3,
+                      style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: strings.abstractHint,
+                        hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                        filled: true,
+                        fillColor: colors.appBackground,
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.divider)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colors.primary)),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
@@ -340,7 +459,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
-                    onPressed: _selectedFile == null || _isExtracting ? null : _handleSave,
+                    onPressed: _isExtracting ? null : _handleSave,
                     icon: const Icon(Icons.check, size: 16),
                     label: Text(
                       strings.addPaperButton,
@@ -369,7 +488,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
           decoration: BoxDecoration(
             color: colors.primary.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(12),
@@ -381,15 +500,15 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
           child: Column(
             children: [
               Container(
-                width: 60,
-                height: 60,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
                   color: colors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.cloud_upload_outlined, size: 32, color: colors.primary),
+                child: Icon(Icons.cloud_upload_outlined, size: 30, color: colors.primary),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Text(
                 strings.uploadPdfTitle,
                 style: AppTypography.body.copyWith(
@@ -398,18 +517,18 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                   fontSize: 15,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 strings.uploadPdfSubtitle,
                 style: AppTypography.caption.copyWith(color: colors.textSecondary),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 strings.supportedFormat,
                 style: TextStyle(fontSize: 11, color: colors.textSecondary.withValues(alpha: 0.7)),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
               ElevatedButton.icon(
                 onPressed: _pickPdfFile,
                 icon: const Icon(Icons.folder_open_rounded, size: 16),
@@ -417,7 +536,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.primary,
                   foregroundColor: colors.onPrimary,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
@@ -442,15 +561,15 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.red, size: 26),
+                child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.red, size: 24),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -480,7 +599,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           if (_isExtracting) ...[
             ClipRRect(

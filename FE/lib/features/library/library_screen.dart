@@ -49,8 +49,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
       context: context,
       builder: (context) => ImportPaperDialog(
         strings: widget.settingsVM.strings,
-        onSave: (newPaper) {
-          widget.viewModel.addPaper(newPaper);
+        onSave: (newPaper, bytes, fileName) async {
+          if (bytes != null && fileName != null) {
+            await widget.viewModel.uploadPaper(bytes, fileName);
+          } else {
+            widget.viewModel.addPaper(newPaper);
+          }
           if (mounted) {
             ScaffoldMessenger.of(this.context).showSnackBar(
               SnackBar(

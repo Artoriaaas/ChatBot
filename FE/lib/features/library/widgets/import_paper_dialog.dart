@@ -1,13 +1,17 @@
+import 'dart:io' as io;
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:paper_chat/app/localization/app_strings.dart';
 import 'package:paper_chat/app/theme/app_colors.dart';
 import 'package:paper_chat/app/theme/app_typography.dart';
 import 'package:paper_chat/models/paper.dart';
 
+typedef OnSavePaperCallback = void Function(Paper paper, List<int>? bytes, String? fileName);
+
 class ImportPaperDialog extends StatefulWidget {
   final AppStrings strings;
-  final ValueChanged<Paper> onSave;
+  final OnSavePaperCallback onSave;
 
   const ImportPaperDialog({
     super.key,
@@ -125,7 +129,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       setState(() {
@@ -156,6 +160,16 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
         ? _abstractController.text.trim()
         : 'Tài liệu nghiên cứu: $title.';
 
+    List<int>? bytes;
+    try {
+      bytes = (_selectedFile as dynamic)?.bytes as List<int>?;
+    } catch (_) {}
+    if (bytes == null && !kIsWeb && _selectedFile?.path != null) {
+      try {
+        bytes = await io.File(_selectedFile!.path!).readAsBytes();
+      } catch (_) {}
+    }
+
     final newPaper = Paper(
       id: 'paper_${DateTime.now().millisecondsSinceEpoch}',
       title: title,
@@ -183,7 +197,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
       ],
     );
 
-    widget.onSave(newPaper);
+    widget.onSave(newPaper, bytes, _selectedFile?.name);
     Navigator.pop(context);
   }
 

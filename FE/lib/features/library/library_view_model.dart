@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:paper_chat/models/paper.dart';
 import 'package:paper_chat/services/mock_paper_repository.dart';
+import 'package:paper_chat/services/api_paper_repository.dart';
 
 enum SortMode { yearDesc, yearAsc, titleAsc, titleDesc }
 
@@ -94,6 +95,22 @@ class LibraryViewModel extends ChangeNotifier {
   void addPaper(Paper paper) {
     _repo.addPaper(paper);
     notifyListeners();
+  }
+
+  Future<void> uploadPaper(List<int> bytes, String fileName) async {
+    final repo = _repo;
+    if (repo is ApiPaperRepository) {
+      await repo.uploadAndAddPaper(bytes, fileName);
+    }
+    notifyListeners();
+  }
+
+  Future<void> refreshPapers() async {
+    final repo = _repo;
+    if (repo is ApiPaperRepository) {
+      await repo.fetchRemotePapers();
+      notifyListeners();
+    }
   }
   
   void clearFilters() {

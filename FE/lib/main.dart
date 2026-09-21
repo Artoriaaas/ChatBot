@@ -8,8 +8,9 @@ import 'package:paper_chat/features/notes/notes_view_model.dart';
 import 'package:paper_chat/features/projects/projects_view_model.dart';
 import 'package:paper_chat/features/reader/reader_view_model.dart';
 import 'package:paper_chat/features/settings/settings_view_model.dart';
-import 'package:paper_chat/services/mock_ai_service.dart';
-import 'package:paper_chat/services/mock_paper_repository.dart';
+import 'package:paper_chat/services/api_service.dart';
+import 'package:paper_chat/services/api_paper_repository.dart';
+import 'package:paper_chat/services/api_ai_service.dart';
 import 'package:paper_chat/services/notes_repository.dart';
 import 'package:paper_chat/services/project_repository.dart';
 import 'package:paper_chat/services/settings_repository.dart';
@@ -18,7 +19,7 @@ import 'package:paper_chat/shared/widgets/app_shell.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize repositories
+  // Initialize repositories & API services
   final settingsRepo = SettingsRepository();
   await settingsRepo.init();
   
@@ -28,8 +29,11 @@ void main() async {
   final projectRepo = ProjectRepository();
   await projectRepo.init();
   
-  final paperRepo = MockPaperRepository();
-  final aiService = MockAiService();
+  final apiService = ApiService();
+  final paperRepo = ApiPaperRepository(apiService);
+  await paperRepo.fetchRemotePapers();
+
+  final aiService = ApiAiService(apiService);
   
   // Create view models
   final authVM = AuthViewModel();

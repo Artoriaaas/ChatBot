@@ -4,6 +4,7 @@ import 'package:paper_chat/app/theme/app_colors.dart';
 import 'package:paper_chat/features/library/library_view_model.dart';
 import 'package:paper_chat/features/library/widgets/empty_state.dart';
 import 'package:paper_chat/features/library/widgets/filter_bar.dart';
+import 'package:paper_chat/features/library/widgets/import_paper_dialog.dart';
 import 'package:paper_chat/features/library/widgets/paper_card.dart';
 import 'package:paper_chat/features/settings/settings_view_model.dart';
 import 'package:paper_chat/models/paper.dart';
@@ -44,18 +45,30 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   void _showImportDialog() {
-    final strings = widget.settingsVM.strings;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(strings.importPaper),
-        content: Text(strings.demoNotice),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
+      builder: (context) => ImportPaperDialog(
+        strings: widget.settingsVM.strings,
+        onSave: (newPaper) {
+          widget.viewModel.addPaper(newPaper);
+          if (mounted) {
+            ScaffoldMessenger.of(this.context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(widget.settingsVM.strings.addPaperSuccess),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.green.shade700,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        },
       ),
     );
   }

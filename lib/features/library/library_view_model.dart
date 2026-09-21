@@ -90,6 +90,11 @@ class LibraryViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void addPaper(Paper paper) {
+    _repo.addPaper(paper);
+    notifyListeners();
+  }
   
   void clearFilters() {
     _searchQuery = '';

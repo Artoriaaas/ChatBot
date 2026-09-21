@@ -217,5 +217,25 @@ class AppStrings {
   String get enterValidEmail => isVi ? 'Vui lòng nhập địa chỉ email hợp lệ' : 'Please enter a valid email address';
   String get enterValidOtp => isVi ? 'Vui lòng nhập mã xác thực gồm 6 chữ số' : 'Please enter the 6-digit code';
   String get back => isVi ? 'Quay lại' : 'Back';
+  String get addNewPaperTitle => isVi ? 'Thêm bài báo mới' : 'Add New Paper';
+  String get addNewPaperSubtitle => isVi
+      ? 'Nhập thông tin nghiên cứu hoặc chọn nhanh các bài báo kinh điển có sẵn.'
+      : 'Enter research paper details or quickly load benchmark papers.';
+  String get paperTitleLabel => isVi ? 'Tiêu đề bài báo' : 'Paper Title';
+  String get paperTitleHint => isVi ? 'vd: BERT: Pre-training of Deep Bidirectional Transformers...' : 'e.g., BERT: Pre-training of Deep Bidirectional Transformers...';
+  String get authorsLabel => isVi ? 'Tác giả' : 'Authors';
+  String get authorsHint => isVi ? 'Phân cách bằng dấu phẩy (vd: Jacob Devlin, Ming-Wei Chang)' : 'Separated by comma (e.g., Jacob Devlin, Ming-Wei Chang)';
+  String get yearLabel => isVi ? 'Năm xuất bản' : 'Publication Year';
+  String get collectionLabel => isVi ? 'Bộ sưu tập' : 'Collection';
+  String get tagsLabel => isVi ? 'Thẻ (Tags)' : 'Tags';
+  String get tagsHint => isVi ? 'vd: NLP, Transformer, Language Model' : 'e.g., NLP, Transformer, Language Model';
+  String get abstractLabel => isVi ? 'Tóm tắt bài báo (Abstract)' : 'Abstract';
+  String get abstractHint => isVi ? 'Tóm tắt nội dung chính và đóng góp khoa học của bài báo...' : 'Summary of key methodology and scientific contributions...';
+  String get paperContentLabel => isVi ? 'Nội dung bài báo (Trang 1)' : 'Paper Content (Page 1)';
+  String get paperContentHint => isVi ? 'Nhập nội dung chi tiết bài báo...' : 'Enter detailed paper content...';
+  String get quickPresets => isVi ? 'Chọn mẫu nghiên cứu có sẵn' : 'Quick Presets';
+  String get addPaperButton => isVi ? 'Thêm vào thư viện' : 'Add to Library';
+  String get addPaperSuccess => isVi ? 'Đã thêm bài báo vào thư viện thành công!' : 'Paper successfully added to library!';
+  String get titleRequired => isVi ? 'Vui lòng nhập tiêu đề bài báo' : 'Paper title is required';
 }
 

@@ -13,6 +13,10 @@ class MockPaperRepository {
     }
   }
 
+  void addPaper(Paper paper) {
+    _papers.insert(0, paper);
+  }
+
   static final List<Paper> _papers = [
     Paper(
       id: 'attention',

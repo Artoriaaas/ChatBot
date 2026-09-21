@@ -61,6 +61,170 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  void _showForgotPasswordDialog() {
+    final strings = widget.settingsVM.strings;
+    final emailController = TextEditingController(text: _emailController.text.trim());
+    String? localError;
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final colors = AppColorsExtension.of(context);
+
+            return AlertDialog(
+              backgroundColor: colors.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+              title: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Icon(Icons.lock_reset_rounded, color: colors.primary, size: 20),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      strings.resetPasswordTitle,
+                      style: AppTypography.heading3.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.resetPasswordSubtitle,
+                      style: AppTypography.caption.copyWith(
+                        color: colors.textSecondary,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      strings.emailLabel,
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autofocus: true,
+                      style: AppTypography.body.copyWith(color: colors.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: strings.emailHint,
+                        hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                        prefixIcon: Icon(Icons.email_outlined, size: 18, color: colors.textSecondary),
+                        errorText: localError,
+                        filled: true,
+                        fillColor: colors.appBackground,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.primary)),
+                      ),
+                      onChanged: (_) {
+                        if (localError != null) {
+                          setDialogState(() => localError = null);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
+                  child: Text(strings.cancel, style: TextStyle(color: colors.textSecondary)),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final email = emailController.text.trim();
+                          if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+                            setDialogState(() {
+                              localError = strings.enterValidEmail;
+                            });
+                            return;
+                          }
+
+                          setDialogState(() => isSubmitting = true);
+                          final success = await widget.authVM.sendPasswordResetEmail(email);
+                          if (!dialogContext.mounted) return;
+
+                          if (success) {
+                            Navigator.pop(dialogContext);
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(strings.resetLinkSentSuccess(email)),
+                                      ),
+                                    ],
+                                  ),
+                                  backgroundColor: Colors.green.shade700,
+                                  duration: const Duration(seconds: 4),
+                                ),
+                              );
+                            }
+                          } else {
+                            setDialogState(() {
+                              isSubmitting = false;
+                              localError = widget.authVM.errorMessage ?? strings.enterValidEmail;
+                            });
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primary,
+                    foregroundColor: colors.onPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(strings.sendResetLink, style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppColorsExtension.of(context);
@@ -532,11 +696,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                   ],
                                 ),
                                 TextButton(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Vui lòng kiểm tra hộp thư email của bạn để đặt lại mật khẩu.')),
-                                    );
-                                  },
+                                  onPressed: _showForgotPasswordDialog,
                                   child: Text(strings.forgotPassword, style: TextStyle(fontSize: 12, color: colors.primary, fontWeight: FontWeight.bold)),
                                 ),
                               ],

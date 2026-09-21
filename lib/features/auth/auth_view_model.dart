@@ -129,6 +129,26 @@ class AuthViewModel extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> sendPasswordResetEmail(String email) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    await Future.delayed(const Duration(milliseconds: 600));
+
+    final trimmed = email.trim();
+    if (trimmed.isEmpty || !trimmed.contains('@') || !trimmed.contains('.')) {
+      _errorMessage = 'Email không hợp lệ. Vui lòng kiểm tra lại.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return true;
+  }
+
   void logout() {
     _isLoggedIn = false;
     _currentUser = null;

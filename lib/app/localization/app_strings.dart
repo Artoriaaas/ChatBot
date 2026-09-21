@@ -195,5 +195,14 @@ class AppStrings {
   String get signUpNow => isVi ? 'Đăng ký ngay' : 'Sign up now';
   String get signInNow => isVi ? 'Đăng nhập ngay' : 'Sign in now';
   String get logout => isVi ? 'Đăng xuất' : 'Logout';
+  String get resetPasswordTitle => isVi ? 'Đặt lại mật khẩu' : 'Reset Password';
+  String get resetPasswordSubtitle => isVi
+      ? 'Nhập địa chỉ email liên kết với tài khoản của bạn. Chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu.'
+      : 'Enter the email address associated with your account and we will send you a reset link.';
+  String get sendResetLink => isVi ? 'Gửi liên kết đặt lại' : 'Send Reset Link';
+  String resetLinkSentSuccess(String email) => isVi
+      ? 'Đã gửi liên kết đặt lại mật khẩu đến $email. Vui lòng kiểm tra hộp thư!'
+      : 'Password reset link sent to $email. Please check your inbox!';
+  String get enterValidEmail => isVi ? 'Vui lòng nhập địa chỉ email hợp lệ' : 'Please enter a valid email address';
 }
 

@@ -284,8 +284,7 @@ class _AppShellState extends State<AppShell> {
     return ListenableBuilder(
       listenable: Listenable.merge([
         widget.settingsVM,
-        if (projectsVM != null) projectsVM,
-        ...?projectsVM != null ? [projectsVM] : null,
+        ?projectsVM,
       ]),
       builder: (context, _) {
         final colors = AppColorsExtension.of(context);

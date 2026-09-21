@@ -125,3 +125,4 @@
   1. Liệt kê toàn bộ các ghi chú đã tạo (ghi chú tự do hoặc ghi chú gắn liền với bài báo).
   2. Soạn thảo ghi chú hỗ trợ tiêu đề, nội dung, màu sắc nhãn.
   3. Tìm kiếm ghi chú theo từ khóa, lọc theo bài báo liên quan, xóa ghi chú.
+

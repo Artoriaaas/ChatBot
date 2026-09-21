@@ -165,3 +165,4 @@ sequenceDiagram
 3. **Mô hình AI đề xuất:**
    - **Embeddings:** `text-embedding-3-small` (OpenAI) hoặc `text-embedding-004` (Google Gemini) - Chi phí cực rẻ, tốc độ cao.
    - **Chat LLM:** `gpt-4o-mini` / `gemini-1.5-flash` (cho tốc độ phản hồi nhanh, giá rẻ) hoặc `gpt-4o` / `claude-3-5-sonnet` (cho các truy vấn học thuật phức tạp).
+

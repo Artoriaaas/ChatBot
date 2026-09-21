@@ -28,3 +28,4 @@ docs/
 ## 📌 HƯỚNG DẪN DÀNH CHO FRONTEND TEAM
 1. Đọc file `docs/FE/01_BUSINESS_REQUIREMENTS.md` để nắm các luồng tương tác của người dùng.
 2. Đọc file `docs/FE/02_PENDING_FEATURES.md` để biết vị trí các `Mock Repository` cần thay thế khi Backend bàn giao API thực tế.
+

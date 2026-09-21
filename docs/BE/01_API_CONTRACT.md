@@ -375,3 +375,4 @@ data: {"chunk": "", "done": true, "citations": [{"pageNumber": 2, "quote": "..."
 * `POST /notes`: Tạo ghi chú mới (`{ "title": "Ý tưởng nghiên cứu", "content": "Markdown...", "paperId": "..." }`).
 * `PUT /notes/{id}`: Sửa ghi chú.
 * `DELETE /notes/{id}`: Xóa ghi chú.
+

@@ -34,3 +34,4 @@ Hiện tại giao diện Frontend đã hoàn chỉnh 100% về mặt tương tá
    - Xuất biên bản ghi chú (Export Markdown/PDF Summary) sau khi đọc bài báo.
 5. **Đồng bộ thời gian thực (WebSockets / Supabase Realtime)**:
    - Khi có người khác thêm bài báo vào Dự án chung (tính năng Teamwork tương lai), danh sách bài báo tự động cập nhật mà không cần tải lại trang.
+

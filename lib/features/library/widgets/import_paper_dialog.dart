@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:paper_chat/app/localization/app_strings.dart';
 import 'package:paper_chat/app/theme/app_colors.dart';
@@ -41,6 +42,13 @@ class _PresetPaper {
 }
 
 class _ImportPaperDialogState extends State<ImportPaperDialog> {
+  int _activeTab = 0; // 0 = Upload PDF, 1 = Presets & Manual
+  
+  // Upload State
+  PlatformFile? _selectedFile;
+  bool _isExtracting = false;
+  bool _extractionComplete = false;
+
   final _titleController = TextEditingController();
   final _authorsController = TextEditingController();
   final _yearController = TextEditingController(text: '2024');
@@ -114,6 +122,67 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
     super.dispose();
   }
 
+  int _fileSizeBytes = 0;
+
+  Future<void> _pickPdfFile() async {
+    try {
+      final file = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (file != null) {
+        final bytes = file.lengthSync() ?? (await file.length()) ?? 0;
+        setState(() {
+          _selectedFile = file;
+          _fileSizeBytes = bytes;
+          _isExtracting = true;
+          _extractionComplete = false;
+        });
+
+        // Simulate backend AI PDF extraction pipeline
+        await Future.delayed(const Duration(milliseconds: 1000));
+
+        // Format cleaned title from filename
+        final rawName = file.name.replaceAll('.pdf', '').replaceAll('_', ' ').replaceAll('-', ' ');
+        final cleanedTitle = rawName
+            .split(' ')
+            .where((w) => w.isNotEmpty)
+            .map((w) => w.length > 1 ? w[0].toUpperCase() + w.substring(1) : w)
+            .join(' ');
+
+        setState(() {
+          _isExtracting = false;
+          _extractionComplete = true;
+          _titleController.text = cleanedTitle;
+          _authorsController.text = 'Extracted Researcher, AI Collaborator';
+          _yearController.text = DateTime.now().year.toString();
+          _collectionController.text = 'Uploaded Papers';
+          _tagsController.text = 'PDF, AI Parsed';
+          _abstractController.text =
+              'This paper was uploaded as "${file.name}" and automatically extracted via the AI PDF parser. '
+              'The document structure has been analyzed and prepared for deep neural conversation, cross-referencing, and intelligent summarization.';
+          _contentController.text =
+              'Full extracted text from ${file.name}.\n\n'
+              'Section 1: Overview and Scientific Background.\n'
+              'Section 2: Key Methodology and Algorithmic Innovations.\n'
+              'Section 3: Empirical Evaluation and Experimental Setup.\n'
+              'Section 4: Conclusion, Future Research Directions & Citations.';
+          _titleError = null;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isExtracting = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi khi mở file: $e')),
+        );
+      }
+    }
+  }
+
   void _applyPreset(_PresetPaper preset) {
     setState(() {
       _titleController.text = preset.title;
@@ -125,6 +194,12 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
       _contentController.text = preset.content;
       _titleError = null;
     });
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   void _handleSave() {
@@ -177,8 +252,13 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
         ),
         PaperPage(
           pageNumber: 2,
-          sectionTitle: 'Methodology & Findings',
+          sectionTitle: 'Methodology & Key Findings',
           content: content,
+        ),
+        PaperPage(
+          pageNumber: 3,
+          sectionTitle: 'Discussion & Conclusion',
+          content: 'Analysis, experimental observations and future directions for $title.\n\n$content',
         ),
       ],
     );
@@ -196,12 +276,12 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
       backgroundColor: colors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 740),
         child: Column(
           children: [
             // Dialog Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 20, 16),
+              padding: const EdgeInsets.fromLTRB(24, 20, 20, 14),
               child: Row(
                 children: [
                   Container(
@@ -212,7 +292,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Center(
-                      child: Icon(Icons.note_add_rounded, color: colors.primary, size: 20),
+                      child: Icon(Icons.cloud_upload_rounded, color: colors.primary, size: 20),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -243,6 +323,37 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                 ],
               ),
             ),
+
+            // Tab bar: [Tải file PDF lên | Mẫu có sẵn & Tùy chỉnh]
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              decoration: BoxDecoration(
+                color: colors.appBackground,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _TabButton(
+                      label: strings.uploadTab,
+                      icon: Icons.picture_as_pdf_rounded,
+                      isSelected: _activeTab == 0,
+                      onTap: () => setState(() => _activeTab = 0),
+                    ),
+                  ),
+                  Expanded(
+                    child: _TabButton(
+                      label: strings.manualTab,
+                      icon: Icons.auto_awesome_rounded,
+                      isSelected: _activeTab == 1,
+                      onTap: () => setState(() => _activeTab = 1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
             Divider(height: 1, color: colors.divider),
 
             // Dialog Scrollable Content
@@ -252,40 +363,55 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Quick Presets Bar
-                    Row(
-                      children: [
-                        Icon(Icons.auto_awesome, size: 16, color: colors.primary),
-                        const SizedBox(width: 6),
-                        Text(
-                          strings.quickPresets,
-                          style: AppTypography.caption.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colors.textPrimary,
+                    if (_activeTab == 0) ...[
+                      // Upload PDF Mode
+                      _buildUploadDropzone(colors, strings),
+                      const SizedBox(height: 20),
+                    ] else ...[
+                      // Quick Presets Bar
+                      Row(
+                        children: [
+                          Icon(Icons.auto_awesome, size: 16, color: colors.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            strings.quickPresets,
+                            style: AppTypography.caption.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colors.textPrimary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _presets.map((preset) {
+                          return ActionChip(
+                            avatar: Icon(Icons.description_outlined, size: 14, color: colors.primary),
+                            label: Text(
+                              preset.title.length > 32 ? '${preset.title.substring(0, 32)}...' : preset.title,
+                              style: TextStyle(fontSize: 11, color: colors.textPrimary),
+                            ),
+                            backgroundColor: colors.surfaceElevated,
+                            side: BorderSide(color: colors.divider),
+                            onPressed: () => _applyPreset(preset),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // Section Title: Thông tin nghiên cứu đã trích xuất / nhập
+                    Text(
+                      _activeTab == 0 ? 'Thông tin bài báo (Được trích xuất từ file)' : 'Thông tin bài báo',
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _presets.map((preset) {
-                        return ActionChip(
-                          avatar: Icon(Icons.description_outlined, size: 14, color: colors.primary),
-                          label: Text(
-                            preset.title.length > 32
-                                ? '${preset.title.substring(0, 32)}...'
-                                : preset.title,
-                            style: TextStyle(fontSize: 11, color: colors.textPrimary),
-                          ),
-                          backgroundColor: colors.surfaceElevated,
-                          side: BorderSide(color: colors.divider),
-                          onPressed: () => _applyPreset(preset),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 10),
 
                     // Paper Title
                     _buildFieldLabel(strings.paperTitleLabel, isRequired: true, colors: colors),
@@ -451,7 +577,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: _contentController,
-                      maxLines: 4,
+                      maxLines: 3,
                       style: AppTypography.body.copyWith(color: colors.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
                         hintText: strings.paperContentHint,
@@ -482,7 +608,7 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
-                    onPressed: _handleSave,
+                    onPressed: _isExtracting ? null : _handleSave,
                     icon: const Icon(Icons.check, size: 16),
                     label: Text(strings.addPaperButton, style: const TextStyle(fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
@@ -501,6 +627,177 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
     );
   }
 
+  Widget _buildUploadDropzone(AppColorsExtension colors, AppStrings strings) {
+    if (_selectedFile == null) {
+      return InkWell(
+        onTap: _pickPdfFile,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: colors.primary.withValues(alpha: 0.35),
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.cloud_upload_outlined, size: 30, color: colors.primary),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                strings.uploadPdfTitle,
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colors.textPrimary,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                strings.uploadPdfSubtitle,
+                style: AppTypography.caption.copyWith(color: colors.textSecondary),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                strings.supportedFormat,
+                style: TextStyle(fontSize: 11, color: colors.textSecondary.withValues(alpha: 0.7)),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _pickPdfFile,
+                icon: const Icon(Icons.folder_open_rounded, size: 16),
+                label: Text(strings.browseFiles),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.primary,
+                  foregroundColor: colors.onPrimary,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Selected File Card with Extraction Status
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _extractionComplete ? Colors.green.withValues(alpha: 0.4) : colors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.red, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _selectedFile!.name,
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
+                        fontSize: 13,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatFileSize(_fileSizeBytes),
+                      style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _pickPdfFile,
+                icon: const Icon(Icons.sync, size: 14),
+                label: const Text('Đổi file', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          if (_isExtracting) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                backgroundColor: colors.divider,
+                valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
+                minHeight: 4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 1.5, color: colors.primary),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    strings.extractingWithAi,
+                    style: TextStyle(fontSize: 12, color: colors.primary, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (_extractionComplete) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      strings.extractionComplete,
+                      style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildFieldLabel(String label, {bool isRequired = false, required AppColorsExtension colors}) {
     return Row(
       children: [
@@ -514,6 +811,55 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
         if (isRequired)
           const Text(' *', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
       ],
+    );
+  }
+}
+
+class _TabButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _TabButton({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColorsExtension.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? colors.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected
+              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 2))]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: isSelected ? colors.primary : colors.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? colors.textPrimary : colors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

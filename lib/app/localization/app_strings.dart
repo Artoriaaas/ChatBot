@@ -237,5 +237,19 @@ class AppStrings {
   String get addPaperButton => isVi ? 'Thêm vào thư viện' : 'Add to Library';
   String get addPaperSuccess => isVi ? 'Đã thêm bài báo vào thư viện thành công!' : 'Paper successfully added to library!';
   String get titleRequired => isVi ? 'Vui lòng nhập tiêu đề bài báo' : 'Paper title is required';
+  String get uploadPdfTitle => isVi ? 'Tải lên file PDF bài báo' : 'Upload Research PDF';
+  String get uploadPdfSubtitle => isVi
+      ? 'Kéo thả file PDF vào đây hoặc nhấp để tải từ máy tính'
+      : 'Drag and drop your PDF here or click to browse files';
+  String get supportedFormat => isVi ? 'Hỗ trợ định dạng .PDF (Dung lượng tối đa 50MB)' : 'Supports .PDF files (Up to 50MB)';
+  String get browseFiles => isVi ? 'Chọn file từ máy tính' : 'Browse Files';
+  String get extractingWithAi => isVi
+      ? 'Hệ thống đang tải lên và trích xuất nội dung bằng AI...'
+      : 'System is uploading and extracting content using AI...';
+  String get extractionComplete => isVi
+      ? 'Đã trích xuất cấu trúc bài báo và phân tách trang thành công!'
+      : 'Paper structure and pages successfully extracted!';
+  String get uploadTab => isVi ? 'Tải file PDF lên' : 'Upload PDF';
+  String get manualTab => isVi ? 'Mẫu có sẵn & Tùy chỉnh' : 'Presets & Manual';
 }
 

@@ -23,8 +23,6 @@ class AppSidebar extends StatefulWidget {
   final ValueChanged<Project>? onNewProjectChat;
   final VoidCallback? onCreateProject;
   final VoidCallback? onToggleCollapse;
-  final String activeCollection;
-  final ValueChanged<String>? onSelectCollection;
   final ValueChanged<String>? onSearch;
 
   const AppSidebar({
@@ -44,8 +42,6 @@ class AppSidebar extends StatefulWidget {
     this.onNewProjectChat,
     this.onCreateProject,
     this.onToggleCollapse,
-    this.activeCollection = 'All',
-    this.onSelectCollection,
     this.onSearch,
   });
 
@@ -297,27 +293,6 @@ class _AppSidebarState extends State<AppSidebar> {
                       }),
                     const SizedBox(height: 16),
 
-                    // Section: BỘ SƯU TẬP
-                    _SectionHeader(title: strings.collections),
-                    _SidebarNavItem(
-                      icon: Icons.folder_outlined,
-                      label: 'Transformer',
-                      isSelected: widget.activeCollection == 'Transformer',
-                      onTap: () => widget.onSelectCollection?.call('Transformer'),
-                    ),
-                    _SidebarNavItem(
-                      icon: Icons.folder_outlined,
-                      label: 'Retrieval & RAG',
-                      isSelected: widget.activeCollection == 'Retrieval & RAG',
-                      onTap: () => widget.onSelectCollection?.call('Retrieval & RAG'),
-                    ),
-                    _SidebarNavItem(
-                      icon: Icons.folder_outlined,
-                      label: 'Literature review',
-                      isSelected: widget.activeCollection == 'Literature review',
-                      onTap: () => widget.onSelectCollection?.call('Literature review'),
-                    ),
-                    const SizedBox(height: 16),
 
                     // Section: ĐANG MỞ (Currently Open Papers)
                     if (widget.openPapers.isNotEmpty) ...[

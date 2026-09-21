@@ -52,7 +52,6 @@ class _AppShellState extends State<AppShell> {
   final List<Paper> _openPapers = [];
   Paper? _selectedPaper;
   bool _isSidebarCollapsed = false;
-  String _activeCollection = 'All';
   bool _isProjectChatMode = false;
 
   @override
@@ -377,16 +376,6 @@ class _AppShellState extends State<AppShell> {
                   onNewProjectChat: _onOpenProjectChat,
                   onCreateProject: _showCreateProjectDialog,
                   onToggleCollapse: () => setState(() => _isSidebarCollapsed = true),
-                  activeCollection: _activeCollection,
-                  onSelectCollection: (col) {
-                    setState(() {
-                      _activeCollection = col;
-                      _selectedNavIndex = 0;
-                      _selectedPaper = null;
-                      _isProjectChatMode = false;
-                      widget.projectsVM?.setActiveProject(null);
-                    });
-                  },
                   onSearch: (query) {
                     widget.libraryVM.searchQuery = query;
                     if (_selectedPaper != null) {

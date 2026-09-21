@@ -1,0 +1,289 @@
+import 'package:flutter/material.dart';
+import 'package:paper_chat/app/theme/app_colors.dart';
+import 'package:paper_chat/app/theme/app_typography.dart';
+import 'package:paper_chat/features/settings/settings_view_model.dart';
+
+class ReaderToolbar extends StatelessWidget {
+  final SettingsViewModel settingsVM;
+  final VoidCallback onToggleToc;
+  final bool isTocOpen;
+  final int currentPage;
+  final int totalPages;
+  final ValueChanged<int> onGoToPage;
+  final VoidCallback onPrevPage;
+  final VoidCallback onNextPage;
+  final double zoomLevel;
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final VoidCallback onFitWidth;
+  final bool isHighlightMode;
+  final VoidCallback onToggleHighlightMode;
+  final String searchQuery;
+  final ValueChanged<String> onSearch;
+  final VoidCallback onNextSearchResult;
+  final VoidCallback onPrevSearchResult;
+  final int searchResultCount;
+  final int currentSearchIndex;
+
+  const ReaderToolbar({
+    super.key,
+    required this.settingsVM,
+    required this.onToggleToc,
+    required this.isTocOpen,
+    required this.currentPage,
+    required this.totalPages,
+    required this.onGoToPage,
+    required this.onPrevPage,
+    required this.onNextPage,
+    required this.zoomLevel,
+    required this.onZoomIn,
+    required this.onZoomOut,
+    required this.onFitWidth,
+    required this.isHighlightMode,
+    required this.onToggleHighlightMode,
+    required this.searchQuery,
+    required this.onSearch,
+    required this.onNextSearchResult,
+    required this.onPrevSearchResult,
+    required this.searchResultCount,
+    required this.currentSearchIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColorsExtension.of(context);
+    final pageController = TextEditingController(text: '${currentPage + 1}');
+
+    return ListenableBuilder(
+      listenable: settingsVM,
+      builder: (context, _) {
+        final strings = settingsVM.strings;
+
+        return Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            border: Border(bottom: BorderSide(color: colors.divider)),
+          ),
+          child: Row(
+            children: [
+              // Table of Contents Toggle Button
+              Tooltip(
+                message: strings.tableOfContents,
+                child: TextButton.icon(
+                  onPressed: onToggleToc,
+                  icon: Icon(
+                    Icons.format_list_bulleted,
+                    size: 16,
+                    color: isTocOpen ? colors.primary : colors.textSecondary,
+                  ),
+                  label: Text(
+                    strings.tableOfContents,
+                    style: AppTypography.caption.copyWith(
+                      fontWeight: isTocOpen ? FontWeight.w600 : FontWeight.w400,
+                      color: isTocOpen ? colors.primary : colors.textPrimary,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: isTocOpen ? colors.selectionBackground : Colors.transparent,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Search in PDF input box
+              SizedBox(
+                width: 140,
+                height: 28,
+                child: TextField(
+                  onChanged: onSearch,
+                  style: AppTypography.caption.copyWith(color: colors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: strings.searchInPdf,
+                    hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.7)),
+                    prefixIcon: Icon(Icons.search, size: 14, color: colors.textSecondary),
+                    contentPadding: EdgeInsets.zero,
+                    filled: true,
+                    fillColor: colors.appBackground,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: colors.divider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: colors.divider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: colors.primary),
+                    ),
+                  ),
+                ),
+              ),
+
+              if (searchQuery.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Text(
+                  searchResultCount > 0 ? '${currentSearchIndex + 1}/$searchResultCount' : '0/0',
+                  style: AppTypography.caption.copyWith(color: colors.textSecondary, fontSize: 11),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_up, size: 16),
+                  onPressed: onPrevSearchResult,
+                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                  padding: EdgeInsets.zero,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_down, size: 16),
+                  onPressed: onNextSearchResult,
+                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                  padding: EdgeInsets.zero,
+                ),
+              ],
+
+              const Spacer(),
+
+              // Page Switcher Controls (< 3 / 11 >)
+              IconButton(
+                icon: const Icon(Icons.chevron_left, size: 18),
+                onPressed: currentPage > 0 ? onPrevPage : null,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                padding: EdgeInsets.zero,
+              ),
+              Container(
+                width: 32,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.appBackground,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: colors.divider),
+                ),
+                child: TextField(
+                  controller: pageController,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  style: AppTypography.caption.copyWith(fontWeight: FontWeight.w600),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                  ),
+                  onSubmitted: (val) {
+                    final page = int.tryParse(val);
+                    if (page != null) onGoToPage(page - 1);
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text(
+                  '/$totalPages',
+                  style: AppTypography.caption.copyWith(color: colors.textSecondary),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, size: 18),
+                onPressed: currentPage < totalPages - 1 ? onNextPage : null,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                padding: EdgeInsets.zero,
+              ),
+
+              const SizedBox(width: 12),
+              Container(height: 16, width: 1, color: colors.divider),
+              const SizedBox(width: 12),
+
+              // Zoom Controls (- 110% +)
+              IconButton(
+                icon: const Icon(Icons.remove, size: 16),
+                onPressed: onZoomOut,
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                padding: EdgeInsets.zero,
+              ),
+              SizedBox(
+                width: 44,
+                child: Text(
+                  '${(zoomLevel * 100).toInt()}%',
+                  textAlign: TextAlign.center,
+                  style: AppTypography.caption.copyWith(fontWeight: FontWeight.w500),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add, size: 16),
+                onPressed: onZoomIn,
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                padding: EdgeInsets.zero,
+              ),
+
+              const SizedBox(width: 8),
+
+              // Fit width button
+              Tooltip(
+                message: strings.fitWidth,
+                child: OutlinedButton.icon(
+                  onPressed: onFitWidth,
+                  icon: Icon(Icons.aspect_ratio_rounded, size: 14, color: colors.textSecondary),
+                  label: Text(strings.fitWidth, style: AppTypography.caption),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    side: BorderSide(color: colors.divider),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              // Highlight Tool button
+              Tooltip(
+                message: strings.highlight,
+                child: TextButton.icon(
+                  onPressed: onToggleHighlightMode,
+                  icon: Icon(
+                    Icons.border_color_outlined,
+                    size: 14,
+                    color: isHighlightMode ? colors.onHighlight : colors.textSecondary,
+                  ),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        strings.highlight,
+                        style: AppTypography.caption.copyWith(
+                          color: isHighlightMode ? colors.onHighlight : colors.textPrimary,
+                          fontWeight: isHighlightMode ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        size: 14,
+                        color: isHighlightMode ? colors.onHighlight : colors.textSecondary,
+                      ),
+                    ],
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: isHighlightMode ? colors.highlightBackground : Colors.transparent,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}

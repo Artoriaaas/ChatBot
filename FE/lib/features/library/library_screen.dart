@@ -1,0 +1,220 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:paper_chat/app/theme/app_colors.dart';
+import 'package:paper_chat/features/library/library_view_model.dart';
+import 'package:paper_chat/features/library/widgets/empty_state.dart';
+import 'package:paper_chat/features/library/widgets/filter_bar.dart';
+import 'package:paper_chat/features/library/widgets/import_paper_dialog.dart';
+import 'package:paper_chat/features/library/widgets/paper_card.dart';
+import 'package:paper_chat/features/settings/settings_view_model.dart';
+import 'package:paper_chat/models/paper.dart';
+
+class LibraryScreen extends StatefulWidget {
+  final SettingsViewModel settingsVM;
+  final LibraryViewModel viewModel;
+  final ValueChanged<Paper> onPaperSelected;
+  final ValueChanged<Paper>? onAddPaperToProject;
+
+  const LibraryScreen({
+    super.key,
+    required this.settingsVM,
+    required this.viewModel,
+    required this.onPaperSelected,
+    this.onAddPaperToProject,
+  });
+
+  @override
+  State<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends State<LibraryScreen> {
+  final _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = widget.viewModel.searchQuery;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  void _showImportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => ImportPaperDialog(
+        strings: widget.settingsVM.strings,
+        onSave: (newPaper) {
+          widget.viewModel.addPaper(newPaper);
+          if (mounted) {
+            ScaffoldMessenger.of(this.context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(widget.settingsVM.strings.addPaperSuccess),
+                    ),
+                  ],
+                ),
+                backgroundColor: Colors.green.shade700,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColorsExtension.of(context);
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyO, control: true): _showImportDialog,
+      },
+      child: Focus(
+        autofocus: true,
+        child: ListenableBuilder(
+          listenable: Listenable.merge([widget.viewModel, widget.settingsVM]),
+          builder: (context, _) {
+            final strings = widget.settingsVM.strings;
+            final papers = widget.viewModel.filteredPapers;
+
+            return Scaffold(
+              backgroundColor: colors.appBackground,
+              appBar: AppBar(
+                title: Text(strings.library),
+                backgroundColor: colors.surface,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.add_rounded),
+                    tooltip: '${strings.importPaper} (Ctrl+O)',
+                    onPressed: _showImportDialog,
+                    color: colors.textPrimary,
+                  ),
+                ],
+              ),
+              body: Column(
+                children: [
+                  Container(
+                    color: colors.surfaceElevated,
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      controller: _searchController,
+                      focusNode: _searchFocus,
+                      decoration: InputDecoration(
+                        hintText: strings.searchTitleAuthors,
+                        prefixIcon: Icon(Icons.search, color: colors.textSecondary),
+                        filled: true,
+                        fillColor: colors.appBackground,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        suffixIcon: ListenableBuilder(
+                          listenable: _searchController,
+                          builder: (context, _) {
+                            if (_searchController.text.isEmpty) return const SizedBox.shrink();
+                            return IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                widget.viewModel.searchQuery = '';
+                              },
+                              color: colors.textSecondary,
+                            );
+                          },
+                        ),
+                      ),
+                      onChanged: (val) => widget.viewModel.searchQuery = val,
+                    ),
+                  ),
+                  FilterBar(
+                    settingsVM: widget.settingsVM,
+                    viewModel: widget.viewModel,
+                  ),
+                  Expanded(
+                    child: Builder(
+                      builder: (context) {
+                        final hasFilters = widget.viewModel.searchQuery.isNotEmpty ||
+                            widget.viewModel.showFavoritesOnly ||
+                            widget.viewModel.selectedCollection != null ||
+                            widget.viewModel.selectedTag != null;
+
+                        if (papers.isEmpty) {
+                          return EmptyState(
+                            settingsVM: widget.settingsVM,
+                            isFiltered: hasFilters,
+                            onClearFilters: widget.viewModel.clearFilters,
+                            onImport: _showImportDialog,
+                          );
+                        }
+
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isWide = constraints.maxWidth > 900;
+                            if (isWide) {
+                              return GridView.builder(
+                                padding: const EdgeInsets.all(16),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  childAspectRatio: 3.2,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                ),
+                                itemCount: papers.length,
+                                itemBuilder: (context, index) {
+                                  final paper = papers[index];
+                                  return PaperCard(
+                                    paper: paper,
+                                    onTap: () => widget.onPaperSelected(paper),
+                                    onToggleFavorite: () => widget.viewModel.toggleFavorite(paper.id),
+                                    onAddToProject: widget.onAddPaperToProject != null
+                                        ? () => widget.onAddPaperToProject?.call(paper)
+                                        : null,
+                                  );
+                                },
+                              );
+                            } else {
+                              return ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: papers.length,
+                                itemBuilder: (context, index) {
+                                  final paper = papers[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: PaperCard(
+                                      paper: paper,
+                                      onTap: () => widget.onPaperSelected(paper),
+                                      onToggleFavorite: () => widget.viewModel.toggleFavorite(paper.id),
+                                      onAddToProject: widget.onAddPaperToProject != null
+                                          ? () => widget.onAddPaperToProject?.call(paper)
+                                          : null,
+                                    ),
+                                  );
+                                },
+                              );
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}

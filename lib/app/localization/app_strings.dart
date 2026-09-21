@@ -196,13 +196,26 @@ class AppStrings {
   String get signInNow => isVi ? 'Đăng nhập ngay' : 'Sign in now';
   String get logout => isVi ? 'Đăng xuất' : 'Logout';
   String get resetPasswordTitle => isVi ? 'Đặt lại mật khẩu' : 'Reset Password';
-  String get resetPasswordSubtitle => isVi
-      ? 'Nhập địa chỉ email liên kết với tài khoản của bạn. Chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu.'
-      : 'Enter the email address associated with your account and we will send you a reset link.';
-  String get sendResetLink => isVi ? 'Gửi liên kết đặt lại' : 'Send Reset Link';
-  String resetLinkSentSuccess(String email) => isVi
-      ? 'Đã gửi liên kết đặt lại mật khẩu đến $email. Vui lòng kiểm tra hộp thư!'
-      : 'Password reset link sent to $email. Please check your inbox!';
+  String get resetPasswordStep1Subtitle => isVi
+      ? 'Nhập địa chỉ email liên kết với tài khoản của bạn để nhận mã xác thực một lần (OTP).'
+      : 'Enter your email address to receive a one-time verification code (OTP).';
+  String get resetPasswordStep2Subtitle => isVi
+      ? 'Nhập mã xác thực một lần và mật khẩu mới của bạn.'
+      : 'Enter the one-time code and choose a new password.';
+  String get sendOtpCode => isVi ? 'Gửi mã xác nhận' : 'Send Code';
+  String get resendCode => isVi ? 'Gửi lại mã' : 'Resend Code';
+  String get otpCodeLabel => isVi ? 'Mã xác thực một lần (OTP)' : 'One-Time Code (OTP)';
+  String get otpCodeHint => isVi ? 'Nhập mã 6 chữ số (Mã thử nghiệm: 123456)' : 'Enter 6-digit code (Demo: 123456)';
+  String get newPasswordLabel => isVi ? 'Mật khẩu mới' : 'New Password';
+  String get newPasswordHint => isVi ? 'Nhập mật khẩu mới (ít nhất 6 ký tự)' : 'Enter new password (min 6 chars)';
+  String get confirmNewPasswordLabel => isVi ? 'Xác nhận mật khẩu mới' : 'Confirm New Password';
+  String get confirmNewPasswordHint => isVi ? 'Nhập lại mật khẩu mới' : 'Re-enter new password';
+  String get resetPasswordButton => isVi ? 'Đặt lại mật khẩu' : 'Reset Password';
+  String get resetPasswordSuccess => isVi
+      ? 'Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới.'
+      : 'Password reset successfully! You can now sign in with your new password.';
   String get enterValidEmail => isVi ? 'Vui lòng nhập địa chỉ email hợp lệ' : 'Please enter a valid email address';
+  String get enterValidOtp => isVi ? 'Vui lòng nhập mã xác thực gồm 6 chữ số' : 'Please enter the 6-digit code';
+  String get back => isVi ? 'Quay lại' : 'Back';
 }
 

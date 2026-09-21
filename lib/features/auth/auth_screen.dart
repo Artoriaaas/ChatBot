@@ -64,8 +64,14 @@ class _AuthScreenState extends State<AuthScreen> {
   void _showForgotPasswordDialog() {
     final strings = widget.settingsVM.strings;
     final emailController = TextEditingController(text: _emailController.text.trim());
+    final otpController = TextEditingController(text: '123456');
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    int currentStep = 1;
     String? localError;
     bool isSubmitting = false;
+    bool obscureNewPassword = true;
+    bool obscureConfirmPassword = true;
 
     showDialog(
       context: context,
@@ -90,13 +96,17 @@ class _AuthScreenState extends State<AuthScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Center(
-                      child: Icon(Icons.lock_reset_rounded, color: colors.primary, size: 20),
+                      child: Icon(
+                        currentStep == 1 ? Icons.lock_reset_rounded : Icons.verified_user_rounded,
+                        color: colors.primary,
+                        size: 20,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      strings.resetPasswordTitle,
+                      currentStep == 1 ? strings.resetPasswordTitle : strings.resetPasswordButton,
                       style: AppTypography.heading3.copyWith(
                         fontWeight: FontWeight.bold,
                         color: colors.textPrimary,
@@ -107,116 +117,330 @@ class _AuthScreenState extends State<AuthScreen> {
                 ],
               ),
               content: SizedBox(
-                width: 400,
+                width: 420,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      strings.resetPasswordSubtitle,
-                      style: AppTypography.caption.copyWith(
-                        color: colors.textSecondary,
-                        fontSize: 13,
-                        height: 1.4,
+                    if (currentStep == 1) ...[
+                      Text(
+                        strings.resetPasswordStep1Subtitle,
+                        style: AppTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      strings.emailLabel,
-                      style: AppTypography.caption.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colors.textPrimary,
+                      const SizedBox(height: 16),
+                      Text(
+                        strings.emailLabel,
+                        style: AppTypography.caption.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colors.textPrimary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      autofocus: true,
-                      style: AppTypography.body.copyWith(color: colors.textPrimary),
-                      decoration: InputDecoration(
-                        hintText: strings.emailHint,
-                        hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
-                        prefixIcon: Icon(Icons.email_outlined, size: 18, color: colors.textSecondary),
-                        errorText: localError,
-                        filled: true,
-                        fillColor: colors.appBackground,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.primary)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        autofocus: true,
+                        style: AppTypography.body.copyWith(color: colors.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: strings.emailHint,
+                          hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                          prefixIcon: Icon(Icons.email_outlined, size: 18, color: colors.textSecondary),
+                          errorText: localError,
+                          filled: true,
+                          fillColor: colors.appBackground,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.primary)),
+                        ),
+                        onChanged: (_) {
+                          if (localError != null) {
+                            setDialogState(() => localError = null);
+                          }
+                        },
                       ),
-                      onChanged: (_) {
-                        if (localError != null) {
-                          setDialogState(() => localError = null);
-                        }
-                      },
-                    ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: colors.primary.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 18, color: colors.primary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${strings.resetPasswordStep2Subtitle}\n(Email: ${emailController.text.trim()})',
+                                style: TextStyle(fontSize: 12, color: colors.textPrimary),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // OTP Code field
+                      Text(
+                        strings.otpCodeLabel,
+                        style: AppTypography.caption.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: otpController,
+                        keyboardType: TextInputType.number,
+                        style: AppTypography.body.copyWith(
+                          color: colors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2.0,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: strings.otpCodeHint,
+                          hintStyle: AppTypography.caption.copyWith(
+                            color: colors.textSecondary.withValues(alpha: 0.6),
+                            letterSpacing: 0,
+                          ),
+                          prefixIcon: Icon(Icons.pin_outlined, size: 18, color: colors.textSecondary),
+                          suffixIcon: TextButton(
+                            onPressed: () async {
+                              await widget.authVM.sendPasswordResetOtp(emailController.text.trim());
+                              setDialogState(() {
+                                otpController.text = '123456';
+                              });
+                            },
+                            child: Text(
+                              strings.resendCode,
+                              style: TextStyle(fontSize: 11, color: colors.primary, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: colors.appBackground,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.primary)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // New password field
+                      Text(
+                        strings.newPasswordLabel,
+                        style: AppTypography.caption.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: newPasswordController,
+                        obscureText: obscureNewPassword,
+                        style: AppTypography.body.copyWith(color: colors.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: strings.newPasswordHint,
+                          hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                          prefixIcon: Icon(Icons.lock_outline, size: 18, color: colors.textSecondary),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              size: 18,
+                              color: colors.textSecondary,
+                            ),
+                            onPressed: () => setDialogState(() => obscureNewPassword = !obscureNewPassword),
+                          ),
+                          filled: true,
+                          fillColor: colors.appBackground,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.primary)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Confirm new password field
+                      Text(
+                        strings.confirmNewPasswordLabel,
+                        style: AppTypography.caption.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: confirmPasswordController,
+                        obscureText: obscureConfirmPassword,
+                        style: AppTypography.body.copyWith(color: colors.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: strings.confirmNewPasswordHint,
+                          hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.6)),
+                          prefixIcon: Icon(Icons.lock_reset, size: 18, color: colors.textSecondary),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              size: 18,
+                              color: colors.textSecondary,
+                            ),
+                            onPressed: () => setDialogState(() => obscureConfirmPassword = !obscureConfirmPassword),
+                          ),
+                          filled: true,
+                          fillColor: colors.appBackground,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.divider)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colors.primary)),
+                        ),
+                      ),
+
+                      if (localError != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          localError!,
+                          style: TextStyle(fontSize: 12, color: colors.error, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ],
                   ],
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
-                  child: Text(strings.cancel, style: TextStyle(color: colors.textSecondary)),
-                ),
-                ElevatedButton(
-                  onPressed: isSubmitting
-                      ? null
-                      : () async {
-                          final email = emailController.text.trim();
-                          if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
-                            setDialogState(() {
-                              localError = strings.enterValidEmail;
-                            });
-                            return;
-                          }
-
-                          setDialogState(() => isSubmitting = true);
-                          final success = await widget.authVM.sendPasswordResetEmail(email);
-                          if (!dialogContext.mounted) return;
-
-                          if (success) {
-                            Navigator.pop(dialogContext);
-
-                            if (mounted) {
-                              ScaffoldMessenger.of(this.context).showSnackBar(
-                                SnackBar(
-                                  content: Row(
-                                    children: [
-                                      const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(strings.resetLinkSentSuccess(email)),
-                                      ),
-                                    ],
-                                  ),
-                                  backgroundColor: Colors.green.shade700,
-                                  duration: const Duration(seconds: 4),
-                                ),
-                              );
-                            }
-                          } else {
-                            setDialogState(() {
-                              isSubmitting = false;
-                              localError = widget.authVM.errorMessage ?? strings.enterValidEmail;
-                            });
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primary,
-                    foregroundColor: colors.onPrimary,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                if (currentStep == 1) ...[
+                  TextButton(
+                    onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
+                    child: Text(strings.cancel, style: TextStyle(color: colors.textSecondary)),
                   ),
-                  child: isSubmitting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : Text(strings.sendResetLink, style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
+                  ElevatedButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final email = emailController.text.trim();
+                            if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+                              setDialogState(() {
+                                localError = strings.enterValidEmail;
+                              });
+                              return;
+                            }
+
+                            setDialogState(() => isSubmitting = true);
+                            final success = await widget.authVM.sendPasswordResetOtp(email);
+                            if (!dialogContext.mounted) return;
+
+                            if (success) {
+                              setDialogState(() {
+                                isSubmitting = false;
+                                currentStep = 2;
+                                localError = null;
+                              });
+                            } else {
+                              setDialogState(() {
+                                isSubmitting = false;
+                                localError = widget.authVM.errorMessage ?? strings.enterValidEmail;
+                              });
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(strings.sendOtpCode, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ] else ...[
+                  TextButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () {
+                            setDialogState(() {
+                              currentStep = 1;
+                              localError = null;
+                            });
+                          },
+                    child: Text(strings.back, style: TextStyle(color: colors.textSecondary)),
+                  ),
+                  ElevatedButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final otp = otpController.text.trim();
+                            final newPass = newPasswordController.text;
+                            final confirmPass = confirmPasswordController.text;
+
+                            if (otp.isEmpty) {
+                              setDialogState(() => localError = strings.enterValidOtp);
+                              return;
+                            }
+
+                            setDialogState(() => isSubmitting = true);
+                            final success = await widget.authVM.verifyOtpAndResetPassword(
+                              email: emailController.text.trim(),
+                              otp: otp,
+                              newPassword: newPass,
+                              confirmPassword: confirmPass,
+                            );
+                            if (!dialogContext.mounted) return;
+
+                            if (success) {
+                              Navigator.pop(dialogContext);
+
+                              // Auto populate into login screen for convenience
+                              _emailController.text = emailController.text.trim();
+                              _passwordController.text = newPass;
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(this.context).showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(strings.resetPasswordSuccess),
+                                        ),
+                                      ],
+                                    ),
+                                    backgroundColor: Colors.green.shade700,
+                                    duration: const Duration(seconds: 4),
+                                  ),
+                                );
+                              }
+                            } else {
+                              setDialogState(() {
+                                isSubmitting = false;
+                                localError = widget.authVM.errorMessage ?? strings.enterValidOtp;
+                              });
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.primary,
+                      foregroundColor: colors.onPrimary,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(strings.resetPasswordButton, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
               ],
             );
           },

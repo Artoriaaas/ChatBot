@@ -129,7 +129,7 @@ class AuthViewModel extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> sendPasswordResetEmail(String email) async {
+  Future<bool> sendPasswordResetOtp(String email) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -139,6 +139,45 @@ class AuthViewModel extends ChangeNotifier {
     final trimmed = email.trim();
     if (trimmed.isEmpty || !trimmed.contains('@') || !trimmed.contains('.')) {
       _errorMessage = 'Email không hợp lệ. Vui lòng kiểm tra lại.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> verifyOtpAndResetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    await Future.delayed(const Duration(milliseconds: 700));
+
+    final trimmedOtp = otp.trim();
+    if (trimmedOtp.isEmpty || trimmedOtp != '123456') {
+      _errorMessage = 'Mã xác thực không chính xác (Mã thử nghiệm: 123456).';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    if (newPassword.length < 6) {
+      _errorMessage = 'Mật khẩu mới phải có ít nhất 6 ký tự.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    if (newPassword != confirmPassword) {
+      _errorMessage = 'Mật khẩu xác nhận không trùng khớp.';
       _isLoading = false;
       notifyListeners();
       return false;

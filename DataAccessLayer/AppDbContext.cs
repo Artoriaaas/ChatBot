@@ -12,6 +12,7 @@ namespace DataAccessLayer
         }
         public DbSet<Document> Documents { get; set; }
         public DbSet<DocumentChunk> DocumentChunks { get; set; }
+        public DbSet<Paper> Papers { get; set; }
         public DbSet<ChatHistory> ChatHistories { get; set; }
         public DbSet<ChatHistorySource> ChatHistorySources { get; set; }
 

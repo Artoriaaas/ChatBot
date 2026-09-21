@@ -7,6 +7,96 @@ class ApiService {
 
   ApiService({http.Client? client}) : _client = client ?? http.Client();
 
+  /// Lấy danh sách Paper từ Backend
+  Future<List<Map<String, dynamic>>> getPapers({
+    String? search,
+    String? collection,
+    String? tag,
+    bool? isFavorite,
+    String? sort,
+  }) async {
+    final queryParams = <String, String>{
+      if (search != null && search.isNotEmpty) 'search': search,
+      if (collection != null && collection.isNotEmpty) 'collection': collection,
+      if (tag != null && tag.isNotEmpty) 'tag': tag,
+      if (isFavorite != null) 'isFavorite': isFavorite.toString(),
+      if (sort != null && sort.isNotEmpty) 'sort': sort,
+    };
+
+    final url = Uri.parse('${ApiConfig.baseUrl}/paper').replace(queryParameters: queryParams);
+    final response = await _client.get(url);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> jsonList = jsonDecode(response.body);
+      return jsonList.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception('Lỗi lấy danh sách bài báo (${response.statusCode}): ${response.body}');
+    }
+  }
+
+  /// Tải file bài báo lên Backend
+  Future<Map<String, dynamic>> uploadPaper(
+    List<int> bytes,
+    String fileName, {
+    String? title,
+    String? authors,
+    int? year,
+    String? collection,
+    String? tags,
+    String? abstractText,
+  }) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/paper/upload');
+    final request = http.MultipartRequest('POST', url);
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: fileName,
+      ),
+    );
+
+    if (title != null) request.fields['title'] = title;
+    if (authors != null) request.fields['authors'] = authors;
+    if (year != null) request.fields['year'] = year.toString();
+    if (collection != null) request.fields['collection'] = collection;
+    if (tags != null) request.fields['tags'] = tags;
+    if (abstractText != null) request.fields['abstractText'] = abstractText;
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Lỗi tải file bài báo (${response.statusCode}): ${response.body}');
+    }
+  }
+
+  /// Bật/tắt yêu thích bài báo
+  Future<Map<String, dynamic>> toggleFavoritePaper(int id) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/paper/$id/favorite');
+    final response = await _client.patch(url);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Lỗi thay đổi trạng thái yêu thích (${response.statusCode}): ${response.body}');
+    }
+  }
+
+  /// Xóa bài báo theo ID
+  Future<Map<String, dynamic>> deletePaper(int id) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/paper/$id');
+    final response = await _client.delete(url);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Lỗi xóa bài báo (${response.statusCode}): ${response.body}');
+    }
+  }
+
   /// Lấy danh sách tài liệu từ Backend
   Future<List<Map<String, dynamic>>> getDocuments() async {
     final url = Uri.parse('${ApiConfig.baseUrl}/document');

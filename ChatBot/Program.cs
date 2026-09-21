@@ -19,9 +19,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
 builder.Services.AddScoped<IDocumentChunkRepository, DocumentChunkRepository>();
+builder.Services.AddScoped<IPaperRepository, PaperRepository>();
 
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IDocumentChunkService, DocumentChunkService>();
+builder.Services.AddScoped<IPaperService, PaperService>();
 
 // Đăng ký Background Job sao lưu dữ liệu lên Supabase
 builder.Services.AddHostedService<DatabaseBackupService>();

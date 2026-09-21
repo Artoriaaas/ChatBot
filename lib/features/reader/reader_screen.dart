@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:paper_chat/features/chat/chat_panel.dart';
 import 'package:paper_chat/features/chat/chat_view_model.dart';
-import 'package:paper_chat/features/notes/widgets/note_editor_dialog.dart';
+import 'package:paper_chat/features/notes/widgets/minimizable_note_editor.dart';
 import 'package:paper_chat/features/reader/reader_view_model.dart';
 import 'package:paper_chat/features/reader/widgets/reader_pane.dart';
 import 'package:paper_chat/features/reader/widgets/reader_toolbar.dart';
@@ -45,12 +45,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _isTocOpen = false;
   bool _isHighlightMode = false;
   int _activeNarrowTab = 0; // 0=reader, 1=chat (for narrow mode)
+  bool _isEditingNote = false;
+  Note? _editingNoteTarget;
+  String? _draftNoteTitle;
+  String? _draftNoteContent;
 
   @override
   void initState() {
     super.initState();
     widget.readerViewModel.openPaper(widget.paper);
     widget.chatViewModel.setCurrentPaper(widget.paper);
+  }
+
+  void _openNoteEditor({Note? note, String? initialTitle, String? initialContent}) {
+    setState(() {
+      _isEditingNote = true;
+      _editingNoteTarget = note;
+      _draftNoteTitle = initialTitle ?? (note?.sectionTitle ?? widget.settingsViewModel.strings.newNoteTitle);
+      _draftNoteContent = initialContent ?? (note?.content ?? '');
+    });
   }
 
   void _handleAskAi() {
@@ -80,45 +93,30 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _handleCreateNoteFromSelection() {
     final text = widget.readerViewModel.selectedText;
     final strings = widget.settingsViewModel.strings;
-    showDialog(
-      context: context,
-      builder: (context) => NoteEditorDialog(
-        strings: strings,
-        initialTitle: strings.newNoteTitle,
-        initialContent: text != null && text.isNotEmpty ? '"> $text"\n\n' : '',
-        onSave: (title, content) {
-          final note = Note(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            paperId: widget.paper.id,
-            paperTitle: widget.paper.title,
-            page: widget.readerViewModel.currentPage,
-            sectionTitle: title,
-            content: content,
-            createdAt: DateTime.now(),
-          );
-          widget.notesRepository.addNote(note);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(strings.savedToNotes),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        },
-      ),
+    _openNoteEditor(
+      note: null,
+      initialTitle: strings.newNoteTitle,
+      initialContent: text != null && text.isNotEmpty ? '"> $text"\n\n' : '',
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          if (_isTocOpen) {
-            setState(() => _isTocOpen = false);
-          }
-          widget.readerViewModel.clearSelection();
-        },
-      },
+    return Stack(
+      children: [
+        CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.escape): () {
+              if (_isEditingNote) {
+                setState(() => _isEditingNote = false);
+                return;
+              }
+              if (_isTocOpen) {
+                setState(() => _isTocOpen = false);
+              }
+              widget.readerViewModel.clearSelection();
+            },
+          },
       child: Focus(
         autofocus: true,
         child: LayoutBuilder(
@@ -239,6 +237,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             readerViewModel: widget.readerViewModel,
                             notesRepository: widget.notesRepository,
                             paper: widget.paper,
+                            onOpenNoteEditor: _openNoteEditor,
                           ),
                         ),
                       ],
@@ -252,6 +251,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             readerViewModel: widget.readerViewModel,
                             notesRepository: widget.notesRepository,
                             paper: widget.paper,
+                            onOpenNoteEditor: _openNoteEditor,
                           ),
                         ),
                     ],
@@ -273,6 +273,66 @@ class _ReaderScreenState extends State<ReaderScreen> {
           },
         ),
       ),
-    );
+    ),
+    if (_isEditingNote)
+      MinimizableNoteEditor(
+        strings: widget.settingsViewModel.strings,
+        initialTitle: _draftNoteTitle ?? widget.settingsViewModel.strings.newNoteTitle,
+        initialContent: _draftNoteContent ?? '',
+        isEditing: _editingNoteTarget != null,
+        onDelete: _editingNoteTarget != null
+            ? () async {
+                await widget.notesRepository.deleteNote(_editingNoteTarget!.id);
+                setState(() {
+                  _isEditingNote = false;
+                });
+              }
+            : null,
+        onClose: () {
+          setState(() {
+            _isEditingNote = false;
+          });
+        },
+        onSave: (title, content) async {
+          if (_editingNoteTarget != null) {
+            final updated = Note(
+              id: _editingNoteTarget!.id,
+              paperId: _editingNoteTarget!.paperId,
+              paperTitle: _editingNoteTarget!.paperTitle,
+              page: _editingNoteTarget!.page,
+              sectionTitle: title,
+              content: content,
+              createdAt: _editingNoteTarget!.createdAt,
+            );
+            await widget.notesRepository.updateNote(updated);
+          } else {
+            final note = Note(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              paperId: widget.paper.id,
+              paperTitle: widget.paper.title,
+              page: widget.readerViewModel.currentPage,
+              sectionTitle: title.isNotEmpty
+                  ? title
+                  : (widget.readerViewModel.currentPageContent?.sectionTitle ?? widget.settingsViewModel.strings.newNoteTitle),
+              content: content,
+              createdAt: DateTime.now(),
+            );
+            await widget.notesRepository.addNote(note);
+          }
+          setState(() {
+            _isEditingNote = false;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(this.context).showSnackBar(
+              SnackBar(
+                content: Text(widget.settingsViewModel.strings.savedToNotes),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        },
+      ),
+  ],
+);
   }
 }

@@ -18,6 +18,7 @@ class ChatPanel extends StatefulWidget {
   final ReaderViewModel readerViewModel;
   final NotesRepository notesRepository;
   final Paper paper;
+  final void Function({Note? note, String? initialTitle, String? initialContent})? onOpenNoteEditor;
 
   const ChatPanel({
     super.key,
@@ -26,6 +27,7 @@ class ChatPanel extends StatefulWidget {
     required this.readerViewModel,
     required this.notesRepository,
     required this.paper,
+    this.onOpenNoteEditor,
   });
 
   @override
@@ -80,7 +82,15 @@ class _ChatPanelState extends State<ChatPanel> {
     );
   }
 
-  void _showNoteEditorDialog([Note? existingNote]) {
+  void _openNoteEditor([Note? existingNote]) {
+    if (widget.onOpenNoteEditor != null) {
+      widget.onOpenNoteEditor!(
+        note: existingNote,
+        initialTitle: existingNote?.sectionTitle,
+        initialContent: existingNote?.content,
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => NoteEditorDialog(
@@ -327,7 +337,7 @@ class _ChatPanelState extends State<ChatPanel> {
               ),
               const Spacer(),
               ElevatedButton.icon(
-                onPressed: () => _showNoteEditorDialog(),
+                onPressed: () => _openNoteEditor(),
                 icon: const Icon(Icons.add, size: 14),
                 label: Text(strings.createNote, style: AppTypography.caption.copyWith(color: colors.onPrimary)),
                 style: ElevatedButton.styleFrom(
@@ -416,7 +426,7 @@ class _ChatPanelState extends State<ChatPanel> {
                                 ),
                                 IconButton(
                                   icon: Icon(Icons.edit_outlined, size: 14, color: colors.textSecondary),
-                                  onPressed: () => _showNoteEditorDialog(note),
+                                  onPressed: () => _openNoteEditor(note),
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                                   tooltip: strings.editNote,

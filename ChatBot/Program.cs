@@ -10,6 +10,34 @@ using BusinessObject.Entities;
 using BCrypt.Net;
 using PayOS;
 using System.IO;
+var currentDir = Directory.GetCurrentDirectory();
+string? loadedEnvPath = null;
+
+while (!string.IsNullOrWhiteSpace(currentDir))
+{
+    var envPath = Path.Combine(currentDir, ".env");
+
+    if (File.Exists(envPath))
+    {
+        Env.Load(
+            envPath,
+            new LoadOptions(
+                setEnvVars: true,
+                clobberExistingVars: true,
+                onlyExactPath: true));
+
+        loadedEnvPath = envPath;
+        break;
+    }
+
+    currentDir = Directory.GetParent(currentDir)?.FullName;
+}
+
+if (loadedEnvPath == null)
+{
+    throw new FileNotFoundException(
+        "Không tìm thấy file .env trong project hoặc thư mục cha.");
+}
 
 var builder = WebApplication.CreateBuilder(args);
 

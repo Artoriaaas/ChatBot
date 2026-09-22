@@ -9,6 +9,7 @@ using DataAccessLayer.Repositories;
 using BusinessObject.Entities;
 using BCrypt.Net;
 using PayOS;
+using DotNetEnv;
 using System.IO;
 var currentDir = Directory.GetCurrentDirectory();
 string? loadedEnvPath = null;

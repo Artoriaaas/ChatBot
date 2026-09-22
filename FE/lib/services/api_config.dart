@@ -11,13 +11,13 @@ class ApiConfig {
     if (_overrideBaseUrl.isNotEmpty) {
       return _overrideBaseUrl;
     }
-    
+
     if (kIsWeb) {
-      return 'http://localhost:5000/api';
+      return 'http://localhost:5224/api';
     } else if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:5000/api';
+      return 'http://10.0.2.2:5224/api';
     } else {
-      return 'http://localhost:5000/api';
+      return 'http://localhost:5224/api';
     }
   }
 }

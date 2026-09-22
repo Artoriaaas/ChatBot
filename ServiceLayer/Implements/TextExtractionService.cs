@@ -24,6 +24,7 @@ namespace ServiceLayer.Implements
                 return extension switch
                 {
                     ".pdf" => await ExtractFromPdfAsync(filePath),
+                    ".doc" => (false, null, "Định dạng DOC legacy chưa được hỗ trợ trích xuất. Vui lòng chuyển sang DOCX hoặc PDF."),
                     ".docx" => ExtractFromDocx(filePath),
                     ".pptx" => ExtractFromPptx(filePath),
                     _ => (false, null, $"Unsupported format: {extension}")
@@ -34,6 +35,7 @@ namespace ServiceLayer.Implements
                 return (false, null, $"Extraction failed: {ex.Message}");
             }
         }
+
         
         private async Task<(bool, string?, string?)> ExtractFromPdfAsync(string filePath)
         {

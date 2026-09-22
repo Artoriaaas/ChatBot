@@ -265,7 +265,6 @@ app.UseCors("AllowAll");
 app.MapRazorPages();
 app.MapControllers();
 
-app.MapFallbackToPage("/Auth/Login");
 app.MapHub<ChatBot.Hubs.NotificationHub>("/notificationHub");
 
 //SeedDatabase(app);

@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:paper_chat/models/chat_message.dart';
 import 'package:paper_chat/models/paper.dart';
@@ -6,7 +7,7 @@ import 'package:paper_chat/services/mock_ai_service.dart';
 
 class ChatViewModel extends ChangeNotifier {
   final AiService _aiService;
-  
+
   final Map<String, List<ChatMessage>> _conversations = {};
   String? _currentPaperId;
   Paper? _currentPaper;
@@ -14,14 +15,15 @@ class ChatViewModel extends ChangeNotifier {
   StreamSubscription<AiStreamEvent>? _streamSub;
   String? _selectedTextForChat;
   String? _scope;
-  
+
   ChatViewModel(this._aiService);
-  
-  List<ChatMessage> get currentMessages => _conversations[_currentPaperId] ?? [];
+
+  List<ChatMessage> get currentMessages =>
+      _conversations[_currentPaperId] ?? [];
   bool get isStreaming => _isStreaming;
   String? get selectedTextForChat => _selectedTextForChat;
   String get scope => _scope ?? 'paper';
-  
+
   void setCurrentPaper(Paper paper) {
     if (_currentPaperId != paper.id) {
       stopStreaming();
@@ -30,25 +32,25 @@ class ChatViewModel extends ChangeNotifier {
     _currentPaper = paper;
     notifyListeners();
   }
-  
+
   void setSelectedText(String? text) {
     _selectedTextForChat = text;
     _scope = text != null ? 'selection' : 'paper';
     notifyListeners();
   }
-  
+
   void clearSelectedText() {
     _selectedTextForChat = null;
     _scope = 'paper';
     notifyListeners();
   }
-  
+
   Future<void> sendMessage(String text) async {
     if (_currentPaperId == null || _currentPaper == null) return;
     if (text.trim().isEmpty) return;
-    
+
     final paperId = _currentPaperId!;
-    
+
     final userMsg = ChatMessage(
       id: 'user_${DateTime.now().millisecondsSinceEpoch}',
       role: MessageRole.user,
@@ -61,7 +63,7 @@ class ChatViewModel extends ChangeNotifier {
     );
     _conversations.putIfAbsent(paperId, () => []);
     _conversations[paperId]!.add(userMsg);
-    
+
     final assistantMsg = ChatMessage(
       id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
       role: MessageRole.assistant,
@@ -74,21 +76,21 @@ class ChatViewModel extends ChangeNotifier {
     _conversations[paperId]!.add(assistantMsg);
     _isStreaming = true;
     notifyListeners();
-    
+
     final stream = _aiService.askQuestion(
-      paperId: paperId,
+      paperId: _currentPaper?.documentId ?? paperId,
       question: text,
       selectedText: _selectedTextForChat,
       pages: _currentPaper!.pages,
     );
-    
+
     _streamSub = stream.listen(
       (event) {
         if (_currentPaperId != paperId) return;
         final msgs = _conversations[paperId]!;
         final idx = msgs.indexWhere((m) => m.id == assistantMsg.id);
         if (idx < 0) return;
-        
+
         if (event.isDone) {
           msgs[idx] = msgs[idx].copyWith(
             isStreaming: false,
@@ -127,10 +129,10 @@ class ChatViewModel extends ChangeNotifier {
         }
       },
     );
-    
+
     _selectedTextForChat = null;
   }
-  
+
   void stopStreaming() {
     _streamSub?.cancel();
     _streamSub = null;
@@ -146,7 +148,7 @@ class ChatViewModel extends ChangeNotifier {
     }
     notifyListeners();
   }
-  
+
   void retryLast() {
     if (_currentPaperId == null) return;
     final msgs = _conversations[_currentPaperId!];
@@ -159,7 +161,7 @@ class ChatViewModel extends ChangeNotifier {
       sendMessage(lastUser.content);
     }
   }
-  
+
   @override
   void dispose() {
     _streamSub?.cancel();

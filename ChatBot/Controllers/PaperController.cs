@@ -75,7 +75,8 @@ namespace ChatBot.Controllers
                 if (!success)
                     return BadRequest(new { message });
 
-                return Ok(new { paperId, message });
+                var paper = await _paperService.GetByIdAsync(paperId);
+                return Ok(new { paperId, documentId = paper?.DocumentId, message });
             }
             catch (Exception ex)
             {

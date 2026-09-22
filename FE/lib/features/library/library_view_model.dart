@@ -7,66 +7,88 @@ enum SortMode { yearDesc, yearAsc, titleAsc, titleDesc }
 
 class LibraryViewModel extends ChangeNotifier {
   final MockPaperRepository _repo;
-  
+
   LibraryViewModel(this._repo);
-  
+
   String _searchQuery = '';
   String? _selectedTag;
   String? _selectedCollection;
   SortMode _sortMode = SortMode.yearDesc;
   bool _showFavoritesOnly = false;
-  
+
   String get searchQuery => _searchQuery;
-  set searchQuery(String v) { _searchQuery = v; notifyListeners(); }
+  set searchQuery(String v) {
+    _searchQuery = v;
+    notifyListeners();
+  }
 
   // All papers in the repo. Used by AppShell to resolve a paper by id when
   // navigating from Notes without changing the current filter state.
   List<Paper> get papers => _repo.getAllPapers();
-  
+
   String? get selectedTag => _selectedTag;
-  set selectedTag(String? v) { _selectedTag = v; notifyListeners(); }
-  
+  set selectedTag(String? v) {
+    _selectedTag = v;
+    notifyListeners();
+  }
+
   String? get selectedCollection => _selectedCollection;
-  set selectedCollection(String? v) { _selectedCollection = v; notifyListeners(); }
-  
+  set selectedCollection(String? v) {
+    _selectedCollection = v;
+    notifyListeners();
+  }
+
   SortMode get sortMode => _sortMode;
-  set sortMode(SortMode v) { _sortMode = v; notifyListeners(); }
-  
+  set sortMode(SortMode v) {
+    _sortMode = v;
+    notifyListeners();
+  }
+
   bool get showFavoritesOnly => _showFavoritesOnly;
-  set showFavoritesOnly(bool v) { _showFavoritesOnly = v; notifyListeners(); }
-  
-  List<String> get allTags => _repo.getAllPapers().expand((p) => p.tags).toSet().toList()..sort();
-  List<String> get allCollections => _repo.getAllPapers().map((p) => p.collection).toSet().toList()..sort();
-  
+  set showFavoritesOnly(bool v) {
+    _showFavoritesOnly = v;
+    notifyListeners();
+  }
+
+  List<String> get allTags =>
+      _repo.getAllPapers().expand((p) => p.tags).toSet().toList()..sort();
+  List<String> get allCollections =>
+      _repo.getAllPapers().map((p) => p.collection).toSet().toList()..sort();
+
   List<Paper> get filteredPapers {
     var papers = _repo.getAllPapers().toList();
-    
+
     // Apply search
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
-      papers = papers.where((p) =>
-        p.title.toLowerCase().contains(q) ||
-        p.abstractText.toLowerCase().contains(q) ||
-        p.authors.any((a) => a.toLowerCase().contains(q)) ||
-        p.tags.any((t) => t.toLowerCase().contains(q))
-      ).toList();
+      papers = papers
+          .where(
+            (p) =>
+                p.title.toLowerCase().contains(q) ||
+                p.abstractText.toLowerCase().contains(q) ||
+                p.authors.any((a) => a.toLowerCase().contains(q)) ||
+                p.tags.any((t) => t.toLowerCase().contains(q)),
+          )
+          .toList();
     }
-    
+
     // Apply tag filter
     if (_selectedTag != null) {
       papers = papers.where((p) => p.tags.contains(_selectedTag)).toList();
     }
-    
+
     // Apply collection filter
     if (_selectedCollection != null) {
-      papers = papers.where((p) => p.collection == _selectedCollection).toList();
+      papers = papers
+          .where((p) => p.collection == _selectedCollection)
+          .toList();
     }
-    
+
     // Apply favorites filter
     if (_showFavoritesOnly) {
       papers = papers.where((p) => p.isFavorite).toList();
     }
-    
+
     // Apply sort
     papers.sort((a, b) {
       switch (_sortMode) {
@@ -80,10 +102,10 @@ class LibraryViewModel extends ChangeNotifier {
           return b.title.toLowerCase().compareTo(a.title.toLowerCase());
       }
     });
-    
+
     return papers;
   }
-  
+
   void toggleFavorite(String paperId) {
     final paper = _repo.getPaperById(paperId);
     if (paper != null) {
@@ -97,10 +119,30 @@ class LibraryViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> uploadPaper(List<int> bytes, String fileName) async {
+  Future<void> uploadPaper(
+    List<int> bytes,
+    String fileName, {
+    String? title,
+    String? authors,
+    int? year,
+    String? collection,
+    String? tags,
+    String? abstractText,
+  }) async {
     final repo = _repo;
     if (repo is ApiPaperRepository) {
-      await repo.uploadAndAddPaper(bytes, fileName);
+      await repo.uploadAndAddPaper(
+        bytes,
+        fileName,
+        title: title,
+        authors: authors,
+        year: year,
+        collection: collection,
+        tags: tags,
+        abstractText: abstractText,
+      );
+    } else {
+      throw StateError('Library repository is not connected to the API.');
     }
     notifyListeners();
   }
@@ -112,7 +154,7 @@ class LibraryViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   void clearFilters() {
     _searchQuery = '';
     _selectedTag = null;

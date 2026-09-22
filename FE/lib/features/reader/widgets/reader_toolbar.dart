@@ -24,6 +24,8 @@ class ReaderToolbar extends StatelessWidget {
   final VoidCallback onPrevSearchResult;
   final int searchResultCount;
   final int currentSearchIndex;
+  final bool isContinuousMode;
+  final VoidCallback onToggleContinuousMode;
 
   const ReaderToolbar({
     super.key,
@@ -47,6 +49,8 @@ class ReaderToolbar extends StatelessWidget {
     required this.onPrevSearchResult,
     required this.searchResultCount,
     required this.currentSearchIndex,
+    required this.isContinuousMode,
+    required this.onToggleContinuousMode,
   });
 
   @override
@@ -220,6 +224,30 @@ class ReaderToolbar extends StatelessWidget {
                 onPressed: onZoomIn,
                 constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                 padding: EdgeInsets.zero,
+              ),
+
+              // Continuous / Paged View Mode Toggle
+              Tooltip(
+                message: isContinuousMode ? strings.pagedMode : strings.continuousMode,
+                child: OutlinedButton.icon(
+                  onPressed: onToggleContinuousMode,
+                  icon: Icon(
+                    isContinuousMode ? Icons.view_agenda_outlined : Icons.menu_book_outlined,
+                    size: 14,
+                    color: colors.textSecondary,
+                  ),
+                  label: Text(
+                    isContinuousMode ? strings.continuousMode : strings.pagedMode,
+                    style: AppTypography.caption,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    side: BorderSide(color: colors.divider),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
               ),
 
               const SizedBox(width: 8),

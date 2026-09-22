@@ -50,7 +50,23 @@ namespace ChatBot.Controllers
                     return BadRequest(new { message = errorMessage ?? "Failed to generate answer." });
                 }
 
-                return Ok(result);
+                return Ok(new
+                {
+                    answer = result.Answer,
+                    sources = result.Sources,
+                    promptTokens = result.PromptTokens,
+                    completionTokens = result.CompletionTokens,
+                    totalTokens = result.TotalTokens,
+                    modelName = result.ModelName,
+                    retrievedChunks = result.RetrievedChunks?.Select(c => new
+                    {
+                        id = c.Id,
+                        documentId = c.DocumentId,
+                        chunkOrder = c.ChunkOrder,
+                        content = c.Content,
+                        fileName = c.Document?.FileName
+                    })
+                });
             }
             catch (Exception ex)
             {

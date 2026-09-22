@@ -148,17 +148,25 @@ class ApiPaperRepository extends MockPaperRepository {
       final chunks = await _apiService.getDocumentChunks(
         int.parse(paper.documentId!),
       );
-      paper.pages
-        ..clear()
-        ..addAll(
-          chunks.map(
-            (chunk) => PaperPage(
-              pageNumber: ((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1,
-              sectionTitle: 'Nội dung tài liệu',
-              content: chunk['content'] as String? ?? '',
+      if (chunks.isNotEmpty) {
+        paper.pages
+          ..clear()
+          ..addAll(
+            chunks.map(
+              (chunk) {
+                final rawTitle = chunk['sectionTitle'] as String?;
+                final title = (rawTitle != null && rawTitle.trim().isNotEmpty)
+                    ? rawTitle.trim()
+                    : 'Phần ${((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1}';
+                return PaperPage(
+                  pageNumber: ((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1,
+                  sectionTitle: title,
+                  content: chunk['content'] as String? ?? '',
+                );
+              },
             ),
-          ),
-        );
+          );
+      }
     }
   }
 

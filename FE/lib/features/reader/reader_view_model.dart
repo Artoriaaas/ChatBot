@@ -11,9 +11,11 @@ class ReaderViewModel extends ChangeNotifier {
   String? _selectedText;
   final Map<String, Set<String>> _highlights = {};
   int? _highlightedCitationPage;
+  bool _isContinuousMode = true;
   String? _highlightedCitationText;
 
   Paper? get currentPaper => _currentPaper;
+  bool get isContinuousMode => _isContinuousMode;
   PaperPage? get currentPageContent => 
       _currentPaper != null && _currentPage >= 0 && _currentPage < _currentPaper!.pages.length 
           ? _currentPaper!.pages[_currentPage] 
@@ -28,6 +30,22 @@ class ReaderViewModel extends ChangeNotifier {
   Set<String> get currentHighlights => _currentPaper != null ? _highlights[_currentPaper!.id] ?? {} : {};
   int? get highlightedCitationPage => _highlightedCitationPage;
   String? get highlightedCitationText => _highlightedCitationText;
+
+  void toggleContinuousMode() {
+    _isContinuousMode = !_isContinuousMode;
+    notifyListeners();
+  }
+
+  void setContinuousMode(bool value) {
+    if (_isContinuousMode != value) {
+      _isContinuousMode = value;
+      notifyListeners();
+    }
+  }
+
+  void notifyPaperUpdated() {
+    notifyListeners();
+  }
 
   void openPaper(Paper paper) {
     _currentPaper = paper;

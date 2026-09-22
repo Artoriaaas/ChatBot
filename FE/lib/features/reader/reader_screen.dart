@@ -10,6 +10,8 @@ import 'package:paper_chat/features/reader/widgets/table_of_contents.dart';
 import 'package:paper_chat/features/settings/settings_view_model.dart';
 import 'package:paper_chat/models/note.dart';
 import 'package:paper_chat/models/paper.dart';
+import 'package:paper_chat/services/api_paper_repository.dart';
+import 'package:paper_chat/services/api_service.dart';
 import 'package:paper_chat/services/notes_repository.dart';
 import 'package:paper_chat/shared/widgets/resizable_splitter.dart';
 
@@ -55,6 +57,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
     super.initState();
     widget.readerViewModel.openPaper(widget.paper);
     widget.chatViewModel.setCurrentPaper(widget.paper);
+    _ensureChunksLoaded();
+  }
+
+  Future<void> _ensureChunksLoaded() async {
+    if (widget.paper.documentId != null && widget.paper.pages.length <= 1) {
+      try {
+        final repo = ApiPaperRepository(ApiService());
+        await repo.refreshPaperIndexing(widget.paper);
+        if (mounted) {
+          widget.readerViewModel.notifyPaperUpdated();
+        }
+      } catch (_) {}
+    }
   }
 
   void _openNoteEditor({Note? note, String? initialTitle, String? initialContent}) {
@@ -149,6 +164,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     onPrevSearchResult: widget.readerViewModel.prevSearchResult,
                     searchResultCount: widget.readerViewModel.searchResults.length,
                     currentSearchIndex: widget.readerViewModel.currentSearchResultIndex,
+                    isContinuousMode: widget.readerViewModel.isContinuousMode,
+                    onToggleContinuousMode: widget.readerViewModel.toggleContinuousMode,
                   ),
                 ),
 
@@ -189,10 +206,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             listenable: Listenable.merge([widget.readerViewModel, widget.settingsViewModel]),
                             builder: (context, _) {
                               final pageContent = widget.readerViewModel.currentPageContent;
-                              if (pageContent == null) return const Center(child: CircularProgressIndicator());
+                              if (widget.paper.pages.isEmpty) return const Center(child: CircularProgressIndicator());
                               return ReaderPane(
                                 strings: widget.settingsViewModel.strings,
+                                paper: widget.paper,
                                 pageContent: pageContent,
+                                currentPage: widget.readerViewModel.currentPage,
+                                isContinuousMode: widget.readerViewModel.isContinuousMode,
+                                onPageChanged: widget.readerViewModel.goToPage,
                                 zoomLevel: widget.readerViewModel.zoomLevel,
                                 searchQuery: widget.readerViewModel.searchQuery,
                                 highlights: widget.readerViewModel.currentHighlights,

@@ -131,7 +131,7 @@ class LibraryViewModel extends ChangeNotifier {
   }) async {
     final repo = _repo;
     if (repo is ApiPaperRepository) {
-      await repo.uploadAndAddPaper(
+      final paper = await repo.uploadAndAddPaper(
         bytes,
         fileName,
         title: title,
@@ -141,10 +141,28 @@ class LibraryViewModel extends ChangeNotifier {
         tags: tags,
         abstractText: abstractText,
       );
+      notifyListeners();
+      _monitorIndexing(repo, paper);
     } else {
       throw StateError('Library repository is not connected to the API.');
     }
     notifyListeners();
+  }
+
+  Future<void> _monitorIndexing(ApiPaperRepository repo, Paper paper) async {
+    if (paper.documentId == null) return;
+    for (var attempt = 0; attempt < 120; attempt++) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      try {
+        await repo.refreshPaperIndexing(paper);
+        notifyListeners();
+        if (paper.indexStatus == 'Completed' || paper.indexStatus == 'Failed') {
+          return;
+        }
+      } catch (_) {
+        return;
+      }
+    }
   }
 
   Future<void> refreshPapers() async {

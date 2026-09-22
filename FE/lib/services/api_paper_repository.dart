@@ -55,9 +55,21 @@ class ApiPaperRepository extends MockPaperRepository {
                   '$abstractText\n\nNội dung bài báo "$title" đã được hệ thống Backend lưu trữ và tạo vector chỉ mục AI (Trạng thái: $indexStatus).',
             ),
           ],
+          indexStatus: indexStatus,
+          indexProgress: indexStatus == 'Completed' ? 100 : 0,
         );
 
         _remotePapers.add(paper);
+      }
+
+      for (final paper in _remotePapers) {
+        if (paper.indexStatus == 'Completed') {
+          try {
+            await refreshPaperIndexing(paper);
+          } catch (_) {
+            // Keep the paper visible even if chunk loading is temporarily unavailable.
+          }
+        }
       }
     } catch (_) {
       _remotePapers.clear();
@@ -91,25 +103,62 @@ class ApiPaperRepository extends MockPaperRepository {
       final paperId =
           result['paperId']?.toString() ??
           DateTime.now().millisecondsSinceEpoch.toString();
+      final documentId = result['documentId']?.toString();
 
-      await fetchRemotePapers();
-      return getPaperById(paperId) ??
-          Paper(
-            id: paperId,
-            title: title ?? fileName,
-            authors: authors != null
-                ? authors.split(',').map((a) => a.trim()).toList()
-                : ['Tài liệu tải lên'],
-            year: year ?? DateTime.now().year,
-            abstractText: abstractText ?? 'Đang xử lý...',
-            tags: tags != null
-                ? tags.split(',').map((t) => t.trim()).toList()
-                : ['Backend'],
-            collection: collection ?? 'Tài liệu Backend',
-            pages: const [],
-          );
+      final paper = Paper(
+        id: paperId,
+        documentId: documentId,
+        title: title ?? fileName,
+        authors: authors != null
+            ? authors.split(',').map((a) => a.trim()).toList()
+            : ['Tài liệu tải lên'],
+        year: year ?? DateTime.now().year,
+        abstractText: abstractText ?? 'Đang xử lý...',
+        tags: tags != null
+            ? tags.split(',').map((t) => t.trim()).toList()
+            : ['Backend'],
+        collection: collection ?? 'Tài liệu Backend',
+        pages: [
+          PaperPage(
+            pageNumber: 1,
+            sectionTitle: 'Đang xử lý tài liệu',
+            content: 'Hệ thống đang trích xuất văn bản và chunking tài liệu...',
+          ),
+        ],
+        indexStatus: 'Pending',
+        indexProgress: 0,
+      );
+      _remotePapers.insert(0, paper);
+      return paper;
     } catch (e) {
       rethrow;
+    }
+  }
+
+  Future<void> refreshPaperIndexing(Paper paper) async {
+    if (paper.documentId == null) return;
+    final progress = await _apiService.getDocumentProgress(
+      int.parse(paper.documentId!),
+    );
+    paper.indexStatus = progress['status'] as String? ?? paper.indexStatus;
+    paper.indexProgress =
+        (progress['progress'] as num?)?.toInt() ?? paper.indexProgress;
+
+    if (paper.indexStatus == 'Completed' && paper.pages.length <= 1) {
+      final chunks = await _apiService.getDocumentChunks(
+        int.parse(paper.documentId!),
+      );
+      paper.pages
+        ..clear()
+        ..addAll(
+          chunks.map(
+            (chunk) => PaperPage(
+              pageNumber: ((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1,
+              sectionTitle: 'Nội dung tài liệu',
+              content: chunk['content'] as String? ?? '',
+            ),
+          ),
+        );
     }
   }
 

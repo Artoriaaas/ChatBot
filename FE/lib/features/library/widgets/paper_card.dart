@@ -26,16 +26,19 @@ class _PaperCardState extends State<PaperCard> {
 
   Color _getStatusColor(PaperStatus status, AppColorsExtension colors) {
     switch (status) {
-      case PaperStatus.unread: return Colors.grey;
-      case PaperStatus.reading: return colors.primary;
-      case PaperStatus.completed: return Colors.green;
+      case PaperStatus.unread:
+        return Colors.grey;
+      case PaperStatus.reading:
+        return colors.primary;
+      case PaperStatus.completed:
+        return Colors.green;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColorsExtension.of(context);
-    
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -47,7 +50,9 @@ class _PaperCardState extends State<PaperCard> {
             color: _isHovered ? colors.highlightBackground : colors.surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _isHovered ? colors.primary.withValues(alpha: 0.5) : colors.divider,
+              color: _isHovered
+                  ? colors.primary.withValues(alpha: 0.5)
+                  : colors.divider,
             ),
           ),
           padding: const EdgeInsets.all(12),
@@ -78,11 +83,16 @@ class _PaperCardState extends State<PaperCard> {
                         onTap: widget.onAddToProject,
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: colors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: colors.primary.withValues(alpha: 0.3)),
+                            border: Border.all(
+                              color: colors.primary.withValues(alpha: 0.3),
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -90,7 +100,11 @@ class _PaperCardState extends State<PaperCard> {
                               const SizedBox(width: 2),
                               Text(
                                 'Dự án',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colors.primary),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: colors.primary,
+                                ),
                               ),
                             ],
                           ),
@@ -101,13 +115,17 @@ class _PaperCardState extends State<PaperCard> {
                   IconButton(
                     icon: Icon(
                       widget.paper.isFavorite ? Icons.star : Icons.star_border,
-                      color: widget.paper.isFavorite ? Colors.amber : colors.textSecondary,
+                      color: widget.paper.isFavorite
+                          ? Colors.amber
+                          : colors.textSecondary,
                       size: 20,
                     ),
                     onPressed: widget.onToggleFavorite,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    tooltip: widget.paper.isFavorite ? 'Remove from favorites' : 'Add to favorites',
+                    tooltip: widget.paper.isFavorite
+                        ? 'Remove from favorites'
+                        : 'Add to favorites',
                   ),
                 ],
               ),
@@ -119,6 +137,46 @@ class _PaperCardState extends State<PaperCard> {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 8),
+              if (widget.paper.indexStatus != 'Completed') ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: LinearProgressIndicator(
+                        value: widget.paper.indexProgress / 100,
+                        minHeight: 5,
+                        borderRadius: BorderRadius.circular(4),
+                        backgroundColor: colors.divider,
+                        color: widget.paper.indexStatus == 'Failed'
+                            ? Colors.red
+                            : colors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${widget.paper.indexProgress}%',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  widget.paper.indexStatus == 'Failed'
+                      ? 'Chunking thất bại'
+                      : widget.paper.indexStatus == 'Processing'
+                      ? 'Đang chunking và tạo embedding...'
+                      : 'Đang chờ xử lý...',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: widget.paper.indexStatus == 'Failed'
+                        ? Colors.red
+                        : colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
               Row(
                 children: [
                   Container(
@@ -131,7 +189,10 @@ class _PaperCardState extends State<PaperCard> {
                   ),
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: colors.surfaceElevated,
                       borderRadius: BorderRadius.circular(4),
@@ -139,7 +200,10 @@ class _PaperCardState extends State<PaperCard> {
                     ),
                     child: Text(
                       widget.paper.collection,
-                      style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colors.textSecondary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -149,14 +213,20 @@ class _PaperCardState extends State<PaperCard> {
                       runSpacing: 4,
                       children: widget.paper.tags.take(3).map((tag) {
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: colors.selectionBackground,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             tag,
-                            style: TextStyle(fontSize: 11, color: colors.onSelection),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colors.onSelection,
+                            ),
                           ),
                         );
                       }).toList(),

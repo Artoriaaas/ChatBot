@@ -24,6 +24,8 @@ class Paper {
   bool isFavorite;
   PaperStatus status;
   final List<PaperPage> pages;
+  String indexStatus;
+  int indexProgress;
 
   Paper({
     required this.id,
@@ -37,6 +39,8 @@ class Paper {
     this.isFavorite = false,
     this.status = PaperStatus.unread,
     required this.pages,
+    this.indexStatus = 'Completed',
+    this.indexProgress = 100,
   });
 
   int get totalPages => pages.length;

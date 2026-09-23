@@ -15,11 +15,16 @@ namespace DataAccessLayer
         public DbSet<Paper> Papers { get; set; }
         public DbSet<ChatHistory> ChatHistories { get; set; }
         public DbSet<ChatHistorySource> ChatHistorySources { get; set; }
+        public DbSet<User> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Kích hoạt extension pgvector trong PostgreSQL
             modelBuilder.HasPostgresExtension("vector");
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
 
             modelBuilder.Entity<DocumentChunk>()
                 .Property(e => e.Embedding)

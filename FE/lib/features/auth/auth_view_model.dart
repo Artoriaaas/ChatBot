@@ -1,7 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:paper_chat/models/user_profile.dart';
+import 'package:paper_chat/services/auth_service.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthViewModel extends ChangeNotifier {
+  final AuthService _authService = AuthService();
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+
   bool _isLoggedIn = false;
   bool _isLoading = false;
   String? _errorMessage;
@@ -39,18 +44,30 @@ class AuthViewModel extends ChangeNotifier {
       return false;
     }
 
-    // Success login
-    final nameFromEmail = email.split('@').first;
-    final formattedName = nameFromEmail[0].toUpperCase() + nameFromEmail.substring(1);
-    
-    _currentUser = UserProfile(
-      id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
-      name: formattedName,
-      email: email.trim(),
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      isGoogleAuth: false,
-    );
-    _isLoggedIn = true;
+    try {
+      final token = await _authService.login(email.trim(), password);
+      
+      if (token != null) {
+        // Here we could decode JWT to get user info, but for now we just create a UserProfile
+        final nameFromEmail = email.split('@').first;
+        final formattedName = nameFromEmail[0].toUpperCase() + nameFromEmail.substring(1);
+        
+        _currentUser = UserProfile(
+          id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
+          name: formattedName,
+          email: email.trim(),
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          isGoogleAuth: false,
+        );
+        _isLoggedIn = true;
+      }
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
     _isLoading = false;
     notifyListeners();
     return true;
@@ -96,17 +113,17 @@ class AuthViewModel extends ChangeNotifier {
       return false;
     }
 
-    _currentUser = UserProfile(
-      id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
-      name: name.trim(),
-      email: email.trim(),
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-      isGoogleAuth: false,
-    );
-    _isLoggedIn = true;
-    _isLoading = false;
-    notifyListeners();
-    return true;
+    try {
+      await _authService.register(name.trim(), email.trim(), password);
+      
+      // Auto login after register
+      return await loginWithEmail(email.trim(), password);
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> loginWithGoogle() async {
@@ -114,16 +131,40 @@ class AuthViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
 
-    _currentUser = const UserProfile(
-      id: 'usr_google_1',
-      name: 'Dr. Alex Nguyen',
-      email: 'alex.nguyen@gmail.com',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      isGoogleAuth: true,
-    );
-    _isLoggedIn = true;
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      final token = await _authService.loginWithGoogle(
+        googleUser.email,
+        googleUser.displayName ?? googleUser.email.split('@').first,
+        googleUser.id,
+        googleAuth.idToken,
+      );
+
+      if (token != null) {
+        _currentUser = UserProfile(
+          id: googleUser.id,
+          name: googleUser.displayName ?? googleUser.email.split('@').first,
+          email: googleUser.email,
+          avatarUrl: googleUser.photoUrl ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          isGoogleAuth: true,
+        );
+        _isLoggedIn = true;
+      }
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
     _isLoading = false;
     notifyListeners();
     return true;
@@ -189,6 +230,8 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   void logout() {
+    _authService.logout();
+    _googleSignIn.signOut();
     _isLoggedIn = false;
     _currentUser = null;
     _errorMessage = null;

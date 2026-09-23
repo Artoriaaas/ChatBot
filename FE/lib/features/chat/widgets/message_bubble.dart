@@ -6,6 +6,8 @@ import 'package:paper_chat/app/theme/app_colors.dart';
 import 'package:paper_chat/app/theme/app_typography.dart';
 import 'package:paper_chat/models/chat_message.dart';
 import 'package:paper_chat/features/chat/widgets/citation_chip.dart';
+import 'package:paper_chat/shared/widgets/math_markdown_builder.dart';
+import 'package:markdown/markdown.dart' as md;
 
 class MessageBubble extends StatelessWidget {
   final AppStrings strings;
@@ -180,6 +182,9 @@ class MessageBubble extends StatelessWidget {
                 MarkdownBody(
                   data: message.content + (message.isStreaming ? ' ▋' : ''),
                   selectable: true,
+                  extensionSet: md.ExtensionSet.gitHubFlavored,
+                  inlineSyntaxes: [MathSyntax()],
+                  builders: {'math': MathBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary))},
                   styleSheet: MarkdownStyleSheet(
                     p: AppTypography.body.copyWith(color: colors.textPrimary, height: 1.5),
                     h1: AppTypography.subtitle.copyWith(color: colors.textPrimary, fontWeight: FontWeight.bold),

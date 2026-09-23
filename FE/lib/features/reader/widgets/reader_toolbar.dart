@@ -70,8 +70,10 @@ class ReaderToolbar extends StatelessWidget {
             color: colors.surface,
             border: Border(bottom: BorderSide(color: colors.divider)),
           ),
-          child: Row(
-            children: [
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
               // Table of Contents Toggle Button
               Tooltip(
                 message: strings.tableOfContents,
@@ -309,6 +311,7 @@ class ReaderToolbar extends StatelessWidget {
                 ),
               ),
             ],
+          ),
           ),
         );
       },

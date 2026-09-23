@@ -174,7 +174,7 @@ namespace ServiceLayer.Implements
                 {
                     foreach (var p in abstractNode.Descendants(ns + "p"))
                     {
-                        var text = CleanWhitespace(p.Value);
+                        var text = ExtractFormattedText(p);
                         if (!string.IsNullOrWhiteSpace(text))
                         {
                             abstractBuilder.AppendLine(text);
@@ -218,7 +218,7 @@ namespace ServiceLayer.Implements
                         var pBuilder = new StringBuilder();
                         foreach (var p in div.Elements(ns + "p"))
                         {
-                            var pText = CleanWhitespace(p.Value);
+                            var pText = ExtractFormattedText(p);
                             if (!string.IsNullOrWhiteSpace(pText))
                             {
                                 pBuilder.AppendLine(pText);
@@ -237,7 +237,7 @@ namespace ServiceLayer.Implements
                             }
                             foreach (var subP in subDiv.Elements(ns + "p"))
                             {
-                                var subPText = CleanWhitespace(subP.Value);
+                                var subPText = ExtractFormattedText(subP);
                                 if (!string.IsNullOrWhiteSpace(subPText))
                                 {
                                     pBuilder.AppendLine(subPText);
@@ -295,6 +295,56 @@ namespace ServiceLayer.Implements
             if (string.IsNullOrWhiteSpace(input)) return string.Empty;
             // Thay thế nhiều khoảng trắng liên tiếp bằng 1 khoảng trắng, giữ format từ
             return Regex.Replace(input.Trim(), @"[ \t]+", " ");
+        }
+
+        private static string ExtractFormattedText(XElement element)
+        {
+            if (element == null) return string.Empty;
+            
+            var sb = new StringBuilder();
+            foreach (var node in element.Nodes())
+            {
+                if (node is XText textNode)
+                {
+                    sb.Append(textNode.Value);
+                }
+                else if (node is XElement el)
+                {
+                    var localName = el.Name.LocalName;
+                    if (localName == "hi")
+                    {
+                        var rend = (string?)el.Attribute("rend");
+                        var innerText = ExtractFormattedText(el);
+                        if (string.IsNullOrWhiteSpace(innerText)) continue;
+
+                        if (rend == "bold") sb.Append($"**{innerText.Trim()}**");
+                        else if (rend == "italic") sb.Append($"*{innerText.Trim()}*");
+                        else sb.Append(innerText);
+                    }
+                    else if (localName == "formula")
+                    {
+                        var innerText = ExtractFormattedText(el).Trim();
+                        if (!string.IsNullOrWhiteSpace(innerText))
+                        {
+                            // Wrap formula in $ for inline math
+                            sb.Append($" ${innerText}$ ");
+                        }
+                    }
+                    else if (localName == "ref")
+                    {
+                        var type = (string?)el.Attribute("type");
+                        var innerText = ExtractFormattedText(el);
+                        // For citations and references, just keep the text
+                        sb.Append(innerText);
+                    }
+                    else
+                    {
+                        // Fallback for other elements like <label>, <note>
+                        sb.Append(ExtractFormattedText(el));
+                    }
+                }
+            }
+            return CleanWhitespace(sb.ToString());
         }
     }
 }

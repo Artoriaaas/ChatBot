@@ -5,6 +5,8 @@ import 'package:paper_chat/app/theme/app_colors.dart';
 import 'package:paper_chat/app/theme/app_typography.dart';
 import 'package:paper_chat/features/reader/widgets/selection_menu.dart';
 import 'package:paper_chat/models/paper.dart';
+import 'package:paper_chat/shared/widgets/math_markdown_builder.dart';
+import 'package:markdown/markdown.dart' as md;
 
 class ReaderPane extends StatefulWidget {
   final AppStrings strings;
@@ -203,6 +205,9 @@ class _ReaderPaneState extends State<ReaderPane> {
     Widget textWidget = MarkdownBody(
       data: textContent,
       selectable: false,
+      extensionSet: md.ExtensionSet.gitHubFlavored,
+      inlineSyntaxes: [MathSyntax()],
+      builders: {'math': MathBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary))},
       styleSheet: styleSheet,
     );
 

@@ -2,11 +2,27 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:paper_chat/services/api_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   final http.Client _client;
 
   ApiService({http.Client? client}) : _client = client ?? http.Client();
+
+  Future<Map<String, String>> _getHeaders([Map<String, String>? extraHeaders]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token');
+    
+    final headers = <String, String>{
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+    
+    if (extraHeaders != null) {
+      headers.addAll(extraHeaders);
+    }
+    
+    return headers;
+  }
 
   /// Lấy danh sách Paper từ Backend
   Future<List<Map<String, dynamic>>> getPapers({
@@ -26,7 +42,7 @@ class ApiService {
 
     final url = Uri.parse('${ApiConfig.baseUrl}/paper')
         .replace(queryParameters: queryParams);
-    final response = await _client.get(url);
+    final response = await _client.get(url, headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       final List<dynamic> jsonList = jsonDecode(response.body);
@@ -40,7 +56,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getPaper(int id) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/paper/$id');
-    final response = await _client.get(url);
+    final response = await _client.get(url, headers: await _getHeaders());
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
@@ -60,6 +76,7 @@ class ApiService {
   }) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/paper/upload');
     final request = http.MultipartRequest('POST', url);
+    request.headers.addAll(await _getHeaders());
 
     request.files.add(
       http.MultipartFile.fromBytes('file', bytes, filename: fileName),
@@ -87,7 +104,7 @@ class ApiService {
   /// Bật/tắt yêu thích bài báo
   Future<Map<String, dynamic>> toggleFavoritePaper(int id) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/paper/$id/favorite');
-    final response = await _client.patch(url);
+    final response = await _client.patch(url, headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -101,7 +118,7 @@ class ApiService {
   /// Xóa bài báo theo ID
   Future<Map<String, dynamic>> deletePaper(int id) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/paper/$id');
-    final response = await _client.delete(url);
+    final response = await _client.delete(url, headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -115,7 +132,7 @@ class ApiService {
   /// Lấy danh sách tài liệu từ Backend
   Future<List<Map<String, dynamic>>> getDocuments() async {
     final url = Uri.parse('${ApiConfig.baseUrl}/document');
-    final response = await _client.get(url);
+    final response = await _client.get(url, headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       final List<dynamic> jsonList = jsonDecode(response.body);
@@ -129,7 +146,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getDocumentProgress(int documentId) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/document/$documentId/progress');
-    final response = await _client.get(url);
+    final response = await _client.get(url, headers: await _getHeaders());
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
@@ -138,7 +155,7 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> getDocumentChunks(int documentId) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/document/$documentId/chunks');
-    final response = await _client.get(url);
+    final response = await _client.get(url, headers: await _getHeaders());
     if (response.statusCode == 200) {
       final jsonList = jsonDecode(response.body) as List<dynamic>;
       return jsonList.cast<Map<String, dynamic>>();
@@ -153,6 +170,7 @@ class ApiService {
   ) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/document/upload');
     final request = http.MultipartRequest('POST', url);
+    request.headers.addAll(await _getHeaders());
 
     request.files.add(
       http.MultipartFile.fromBytes('file', bytes, filename: fileName),
@@ -173,7 +191,7 @@ class ApiService {
   /// Xóa tài liệu theo ID
   Future<Map<String, dynamic>> deleteDocument(int id) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/document/$id');
-    final response = await _client.delete(url);
+    final response = await _client.delete(url, headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -187,7 +205,7 @@ class ApiService {
   /// Tái chỉ mục (Reindex) tài liệu
   Future<Map<String, dynamic>> reindexDocument(int id) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/document/$id/reindex');
-    final response = await _client.post(url);
+    final response = await _client.post(url, headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -213,7 +231,7 @@ class ApiService {
 
     final response = await _client.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: await _getHeaders({'Content-Type': 'application/json'}),
       body: body,
     );
 
@@ -238,7 +256,7 @@ class ApiService {
 
     final url = Uri.parse('${ApiConfig.baseUrl}/chat/history')
         .replace(queryParameters: queryParams);
-    final response = await _client.get(url);
+    final response = await _client.get(url, headers: await _getHeaders());
 
     if (response.statusCode == 200) {
       final List<dynamic> jsonList = jsonDecode(response.body);

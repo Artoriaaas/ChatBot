@@ -151,7 +151,9 @@ class _AddPapersDialogState extends State<AddPapersDialog> {
                         itemBuilder: (context, index) {
                           final paper = filteredPapers[index];
                           final isSelected = _selectedPaperIds.contains(paper.id);
-                          return CheckboxListTile(
+                          return Material(
+                            color: Colors.transparent,
+                            child: CheckboxListTile(
                             dense: true,
                             title: Text(
                               paper.title,
@@ -181,7 +183,8 @@ class _AddPapersDialogState extends State<AddPapersDialog> {
                                 }
                               });
                             },
-                            activeColor: colors.primary,
+                              activeColor: colors.primary,
+                            ),
                           );
                         },
                       ),

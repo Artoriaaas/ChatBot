@@ -1,9 +1,15 @@
 using BusinessObject.Entities;
 using DataAccessLayer;
 using DataAccessLayer.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Pgvector;
 using ServiceLayer.Interfaces;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace ServiceLayer.Implements
 {
@@ -51,23 +57,71 @@ namespace ServiceLayer.Implements
                 await _documentRepository.UpdateAsync(document);
                 await _documentRepository.SaveChangesAsync();
 
-                // 1. Đọc nội dung file
-                var (extractSuccess, extractedText, extractError) =
-                    await _textExtractionService.ExtractTextAsync(
-                        document.FilePath);
+                // 1. Đọc nội dung file và trích xuất cấu trúc văn bản chi tiết
+                var extractionResult = await _textExtractionService.ExtractDocumentFullAsync(document.FilePath);
 
-                if (!extractSuccess)
+                if (!extractionResult.Success || string.IsNullOrWhiteSpace(extractionResult.FullText))
                 {
                     await MarkAsFailedAsync(
                         document,
-                        $"Text extraction failed: {extractError}");
+                        $"Text extraction failed: {extractionResult.ErrorMessage}");
 
-                    return (false, extractError);
+                    return (false, extractionResult.ErrorMessage);
                 }
 
-                // 2. Tự động băm nhỏ văn bản (mặc định ChunkSize = 512, Overlap = 50)
+                // 1.1 Lưu cấu trúc các phân đoạn (Sections) vào file sidecar để FE đọc nhanh
+                try
+                {
+                    var structureJsonPath = document.FilePath + ".structure.json";
+                    var json = JsonSerializer.Serialize(extractionResult.Sections);
+                    await File.WriteAllTextAsync(structureJsonPath, json);
+                }
+                catch (Exception jsonEx)
+                {
+                    Console.WriteLine($"[Indexing] ⚠️ Không thể lưu file structure.json: {jsonEx.Message}");
+                }
+
+                // 1.2 Tự động đồng bộ metadata trích xuất được vào Paper tương ứng nếu có
+                try
+                {
+                    var linkedPaper = await _context.Papers.FirstOrDefaultAsync(p => p.DocumentId == document.Id);
+                    if (linkedPaper != null)
+                    {
+                        if (!string.IsNullOrWhiteSpace(extractionResult.Title) && 
+                            (string.IsNullOrWhiteSpace(linkedPaper.Title) || linkedPaper.Title == Path.GetFileNameWithoutExtension(document.FileName)))
+                        {
+                            linkedPaper.Title = extractionResult.Title;
+                        }
+                        if (!string.IsNullOrWhiteSpace(extractionResult.Authors) && 
+                            (string.IsNullOrWhiteSpace(linkedPaper.Authors) || linkedPaper.Authors == "Chưa rõ tác giả"))
+                        {
+                            linkedPaper.Authors = extractionResult.Authors;
+                        }
+                        if (!string.IsNullOrWhiteSpace(extractionResult.AbstractText) && 
+                            (string.IsNullOrWhiteSpace(linkedPaper.AbstractText) || linkedPaper.AbstractText.StartsWith("Bài báo nghiên cứu")))
+                        {
+                            linkedPaper.AbstractText = extractionResult.AbstractText;
+                        }
+                        if (extractionResult.Year.HasValue)
+                        {
+                            linkedPaper.Year = extractionResult.Year.Value;
+                        }
+                        if (extractionResult.TotalPages > 0)
+                        {
+                            linkedPaper.TotalPages = extractionResult.TotalPages;
+                        }
+
+                        await _context.SaveChangesAsync();
+                    }
+                }
+                catch (Exception paperEx)
+                {
+                    Console.WriteLine($"[Indexing] ⚠️ Cập nhật metadata cho Paper thất bại: {paperEx.Message}");
+                }
+
+                // 2. Tự động băm nhỏ văn bản (bảo toàn cấu trúc đoạn và dấu xuống dòng)
                 var chunks = _chunkingService.ChunkText(
-                    extractedText ?? string.Empty,
+                    extractionResult.FullText,
                     512,
                     50);
 
@@ -174,9 +228,6 @@ namespace ServiceLayer.Implements
             await _documentRepository.SaveChangesAsync();
 
             _cache.Remove($"doc_progress_{document.Id}");
-
-            // Không xóa file gốc.
-            // Sau khi sửa API key hoặc model vẫn có thể Re-index.
         }
     }
 }

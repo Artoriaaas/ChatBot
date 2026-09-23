@@ -12,7 +12,7 @@ namespace ServiceLayer.Implements
         private readonly string _apiKey;
         private readonly HttpClient _httpClient;
 
-        private const string ModelName = "gemini-1.5-flash";
+        private const string ModelName = "gemini-3.6-flash";
 
         public ChatService(string apiKey)
         {
@@ -46,7 +46,7 @@ namespace ServiceLayer.Implements
             string? errorMessage)>
         GenerateAnswerAsync(string prompt)
         {
-            string activeModel = "gemini-1.5-flash";
+            string activeModel = "gemini-3.6-flash";
             try
             {
                 if (string.IsNullOrWhiteSpace(prompt))
@@ -80,7 +80,7 @@ namespace ServiceLayer.Implements
 
                 var json = JsonSerializer.Serialize(requestBody);
 
-                var models = new[] { "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro" };
+                var models = new[] { "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.1-flash-lite" };
                 int maxRetries = models.Length;
                 HttpResponseMessage? response = null;
                 string responseContent = string.Empty;
@@ -113,20 +113,18 @@ namespace ServiceLayer.Implements
                         response?.Dispose();
                         response = null;
 
-                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
                         response = await _httpClient.SendAsync(request, cts.Token);
                         responseContent = await response.Content.ReadAsStringAsync();
 
                         Console.WriteLine($"Gemini response: {(int)response.StatusCode} {response.StatusCode}");
 
-                        if (response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable || 
-                            response.StatusCode == System.Net.HttpStatusCode.TooManyRequests || 
-                            response.StatusCode == System.Net.HttpStatusCode.InternalServerError)
+                        if (!response.IsSuccessStatusCode)
                         {
                             if (i < maxRetries - 1)
                             {
-                                var delay = (int)Math.Pow(2, i) * 1000; // 1s, 2s
-                                Console.WriteLine($"API ({activeModel}) quá tải hoặc lỗi. Đang chuyển sang mô hình dự phòng sau {delay}ms...");
+                                var delay = (int)Math.Pow(2, i) * 500;
+                                Console.WriteLine($"API ({activeModel}) trả về lỗi {response.StatusCode}. Đang chuyển sang mô hình dự phòng ({models[i + 1]}) sau {delay}ms...");
                                 await Task.Delay(delay);
                                 continue;
                             }
@@ -144,7 +142,7 @@ namespace ServiceLayer.Implements
                         throw;
                     }
                     
-                    break; // Success or non-retriable error
+                    break; // Success or last retry
                 }
 
                 Console.WriteLine(responseContent);

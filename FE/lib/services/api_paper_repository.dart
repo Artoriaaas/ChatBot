@@ -19,17 +19,27 @@ class ApiPaperRepository extends MockPaperRepository {
         final id = item['id']?.toString() ?? '0';
         final title = item['title'] as String? ?? 'Bài báo không tiêu đề';
         final rawAuthors = item['authors'] as String? ?? 'Tác giả chưa rõ';
-        final authors = rawAuthors.split(',').map((a) => a.trim()).where((a) => a.isNotEmpty).toList();
+        final authors = rawAuthors
+            .split(',')
+            .map((a) => a.trim())
+            .where((a) => a.isNotEmpty)
+            .toList();
         final year = item['year'] as int? ?? DateTime.now().year;
-        final abstractText = item['abstractText'] as String? ?? 'Chưa có tóm tắt.';
+        final abstractText =
+            item['abstractText'] as String? ?? 'Chưa có tóm tắt.';
         final collection = item['collection'] as String? ?? 'Tài liệu Backend';
         final rawTags = item['tags'] as String? ?? 'Research';
-        final tags = rawTags.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+        final tags = rawTags
+            .split(',')
+            .map((t) => t.trim())
+            .where((t) => t.isNotEmpty)
+            .toList();
         final isFavorite = item['isFavorite'] as bool? ?? false;
         final indexStatus = item['indexStatus'] as String? ?? 'Completed';
 
         final paper = Paper(
           id: id,
+          documentId: item['documentId']?.toString(),
           title: title,
           authors: authors.isNotEmpty ? authors : ['Nghiên cứu viên'],
           year: year,
@@ -41,47 +51,28 @@ class ApiPaperRepository extends MockPaperRepository {
             PaperPage(
               pageNumber: 1,
               sectionTitle: 'Tóm tắt & Nội dung bài báo',
-              content: '$abstractText\n\nNội dung bài báo "$title" đã được hệ thống Backend lưu trữ và tạo vector chỉ mục AI (Trạng thái: $indexStatus).',
+              content:
+                  '$abstractText\n\nNội dung bài báo "$title" đã được hệ thống Backend lưu trữ và tạo vector chỉ mục AI (Trạng thái: $indexStatus).',
             ),
           ],
+          indexStatus: indexStatus,
+          indexProgress: indexStatus == 'Completed' ? 100 : 0,
         );
 
         _remotePapers.add(paper);
       }
-    } catch (e) {
-      // 2. Fallback sang API Documents nếu chưa có dữ liệu Paper
-      try {
-        final docs = await _apiService.getDocuments();
-        _remotePapers.clear();
 
-        for (final doc in docs) {
-          final id = doc['id']?.toString() ?? '0';
-          final fileName = doc['fileName'] as String? ?? 'Document $id';
-          final fileSize = doc['fileSize'] as int? ?? 0;
-          final uploadDateStr = doc['uploadDate'] as String?;
-          final uploadYear = uploadDateStr != null ? (DateTime.tryParse(uploadDateStr)?.year ?? 2026) : 2026;
-          final indexStatus = doc['indexStatus'] as String? ?? 'Unknown';
-
-          final paper = Paper(
-            id: id,
-            title: fileName,
-            authors: ['Uploaded File', '${(fileSize / 1024).toStringAsFixed(1)} KB'],
-            year: uploadYear,
-            abstractText: 'Tài liệu đã được tải lên Backend và lưu giữ trong PostgreSQL vector (Trạng thái AI: $indexStatus).',
-            tags: ['Backend', indexStatus],
-            collection: 'Tài liệu Backend',
-            pages: [
-              PaperPage(
-                pageNumber: 1,
-                sectionTitle: 'Thông tin tài liệu',
-                content: 'Tên file: $fileName\nTrạng thái Lập chỉ mục: $indexStatus\nĐường dẫn: ${doc['filePath'] ?? 'N/A'}',
-              ),
-            ],
-          );
-
-          _remotePapers.add(paper);
+      for (final paper in _remotePapers) {
+        if (paper.indexStatus == 'Completed') {
+          try {
+            await refreshPaperIndexing(paper);
+          } catch (_) {
+            // Keep the paper visible even if chunk loading is temporarily unavailable.
+          }
         }
-      } catch (_) {}
+      }
+    } catch (_) {
+      _remotePapers.clear();
     }
     return getAllPapers();
   }
@@ -109,57 +100,79 @@ class ApiPaperRepository extends MockPaperRepository {
         abstractText: abstractText,
       );
 
-      final paperId = result['paperId']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
+      final paperId =
+          result['paperId']?.toString() ??
+          DateTime.now().millisecondsSinceEpoch.toString();
+      final documentId = result['documentId']?.toString();
 
       final paper = Paper(
         id: paperId,
+        documentId: documentId,
         title: title ?? fileName,
-        authors: authors != null ? authors.split(',').map((a) => a.trim()).toList() : ['Tài liệu tải lên'],
+        authors: authors != null
+            ? authors.split(',').map((a) => a.trim()).toList()
+            : ['Tài liệu tải lên'],
         year: year ?? DateTime.now().year,
-        abstractText: abstractText ?? 'Tài liệu vừa tải lên Backend thành công, đang tiến hành lập chỉ mục AI trong nền...',
-        tags: tags != null ? tags.split(',').map((t) => t.trim()).toList() : ['Backend', 'Pending'],
+        abstractText: abstractText ?? 'Đang xử lý...',
+        tags: tags != null
+            ? tags.split(',').map((t) => t.trim()).toList()
+            : ['Backend'],
         collection: collection ?? 'Tài liệu Backend',
         pages: [
           PaperPage(
             pageNumber: 1,
-            sectionTitle: 'Đang xử lý',
-            content: 'Nội dung tệp $fileName đang được hệ thống Backend trích xuất văn bản và tạo vector embedding...',
+            sectionTitle: 'Đang xử lý tài liệu',
+            content: 'Hệ thống đang trích xuất văn bản và chunking tài liệu...',
           ),
         ],
+        indexStatus: 'Pending',
+        indexProgress: 0,
       );
-
       _remotePapers.insert(0, paper);
       return paper;
     } catch (e) {
-      // Fallback sang uploadDocument nếu uploadPaper lỗi
-      final result = await _apiService.uploadDocument(bytes, fileName);
-      final docId = result['documentId']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString();
+      rethrow;
+    }
+  }
 
-      final paper = Paper(
-        id: docId,
-        title: fileName,
-        authors: ['Tài liệu tải lên'],
-        year: DateTime.now().year,
-        abstractText: 'Tài liệu vừa tải lên Backend thành công.',
-        tags: ['Backend', 'Pending'],
-        collection: 'Tài liệu Backend',
-        pages: [
-          PaperPage(
-            pageNumber: 1,
-            sectionTitle: 'Đang xử lý',
-            content: 'Nội dung tệp $fileName đang được hệ thống Backend trích xuất text...',
-          ),
-        ],
+  Future<void> refreshPaperIndexing(Paper paper) async {
+    if (paper.documentId == null) return;
+    final progress = await _apiService.getDocumentProgress(
+      int.parse(paper.documentId!),
+    );
+    paper.indexStatus = progress['status'] as String? ?? paper.indexStatus;
+    paper.indexProgress =
+        (progress['progress'] as num?)?.toInt() ?? paper.indexProgress;
+
+    if (paper.indexStatus == 'Completed' && paper.pages.length <= 1) {
+      final chunks = await _apiService.getDocumentChunks(
+        int.parse(paper.documentId!),
       );
-
-      _remotePapers.insert(0, paper);
-      return paper;
+      if (chunks.isNotEmpty) {
+        paper.pages
+          ..clear()
+          ..addAll(
+            chunks.map(
+              (chunk) {
+                final rawTitle = chunk['sectionTitle'] as String?;
+                final title = (rawTitle != null && rawTitle.trim().isNotEmpty)
+                    ? rawTitle.trim()
+                    : 'Phần ${((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1}';
+                return PaperPage(
+                  pageNumber: ((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1,
+                  sectionTitle: title,
+                  content: chunk['content'] as String? ?? '',
+                );
+              },
+            ),
+          );
+      }
     }
   }
 
   @override
   List<Paper> getAllPapers() {
-    return [..._remotePapers, ...super.getAllPapers()];
+    return List.unmodifiable(_remotePapers);
   }
 
   @override
@@ -167,7 +180,7 @@ class ApiPaperRepository extends MockPaperRepository {
     try {
       return _remotePapers.firstWhere((p) => p.id == id);
     } catch (_) {
-      return super.getPaperById(id);
+      return null;
     }
   }
 

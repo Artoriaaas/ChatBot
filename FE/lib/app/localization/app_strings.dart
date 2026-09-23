@@ -61,6 +61,11 @@ class AppStrings {
   String get highlight => isVi ? 'Tô sáng' : 'Highlight';
   String get page => isVi ? 'trang' : 'page';
   String get pageAbbr => isVi ? 'tr.' : 'p.';
+  String get continuousMode => isVi ? 'Cuộn liên tục' : 'Continuous scroll';
+  String get pagedMode => isVi ? 'Đọc từng trang' : 'Page by page';
+  String get prevSection => isVi ? 'Mục trước' : 'Previous section';
+  String get nextSection => isVi ? 'Mục tiếp theo' : 'Next section';
+  String get endOfDocument => isVi ? 'Hết nội dung tài liệu' : 'End of document';
   String pageIndicator(int current, int total) => isVi ? 'Trang $current/$total' : 'Page $current/$total';
   String searchMatchIndicator(int current, int total) => isVi ? '$current/$total' : '$current/$total';
 

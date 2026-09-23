@@ -128,12 +128,13 @@ class _AddPapersDialogState extends State<AddPapersDialog> {
             // Filtered Papers List
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 260),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colors.appBackground,
+              child: Material(
+                color: colors.appBackground,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: colors.divider),
+                  side: BorderSide(color: colors.divider),
                 ),
+                clipBehavior: Clip.antiAlias,
                 child: filteredPapers.isEmpty
                     ? Center(
                         child: Padding(

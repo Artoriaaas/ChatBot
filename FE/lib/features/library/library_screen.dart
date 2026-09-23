@@ -50,17 +50,26 @@ class _LibraryScreenState extends State<LibraryScreen> {
       builder: (context) => ImportPaperDialog(
         strings: widget.settingsVM.strings,
         onSave: (newPaper, bytes, fileName) async {
-          if (bytes != null && fileName != null) {
-            await widget.viewModel.uploadPaper(bytes, fileName);
-          } else {
-            widget.viewModel.addPaper(newPaper);
-          }
+          await widget.viewModel.uploadPaper(
+            bytes,
+            fileName,
+            title: newPaper.title,
+            authors: newPaper.authors.join(', '),
+            year: newPaper.year,
+            collection: newPaper.collection,
+            tags: newPaper.tags.join(', '),
+            abstractText: newPaper.abstractText,
+          );
           if (mounted) {
             ScaffoldMessenger.of(this.context).showSnackBar(
               SnackBar(
                 content: Row(
                   children: [
-                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(widget.settingsVM.strings.addPaperSuccess),
@@ -83,7 +92,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyO, control: true): _showImportDialog,
+        const SingleActivator(LogicalKeyboardKey.keyO, control: true):
+            _showImportDialog,
       },
       child: Focus(
         autofocus: true,
@@ -117,7 +127,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       focusNode: _searchFocus,
                       decoration: InputDecoration(
                         hintText: strings.searchTitleAuthors,
-                        prefixIcon: Icon(Icons.search, color: colors.textSecondary),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: colors.textSecondary,
+                        ),
                         filled: true,
                         fillColor: colors.appBackground,
                         border: OutlineInputBorder(
@@ -127,7 +140,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         suffixIcon: ListenableBuilder(
                           listenable: _searchController,
                           builder: (context, _) {
-                            if (_searchController.text.isEmpty) return const SizedBox.shrink();
+                            if (_searchController.text.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
                             return IconButton(
                               icon: const Icon(Icons.clear),
                               onPressed: () {
@@ -149,7 +164,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   Expanded(
                     child: Builder(
                       builder: (context) {
-                        final hasFilters = widget.viewModel.searchQuery.isNotEmpty ||
+                        final hasFilters =
+                            widget.viewModel.searchQuery.isNotEmpty ||
                             widget.viewModel.showFavoritesOnly ||
                             widget.viewModel.selectedCollection != null ||
                             widget.viewModel.selectedTag != null;
@@ -169,21 +185,25 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             if (isWide) {
                               return GridView.builder(
                                 padding: const EdgeInsets.all(16),
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  childAspectRatio: 3.2,
-                                  crossAxisSpacing: 16,
-                                  mainAxisSpacing: 16,
-                                ),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      childAspectRatio: 3.2,
+                                      crossAxisSpacing: 16,
+                                      mainAxisSpacing: 16,
+                                    ),
                                 itemCount: papers.length,
                                 itemBuilder: (context, index) {
                                   final paper = papers[index];
                                   return PaperCard(
                                     paper: paper,
                                     onTap: () => widget.onPaperSelected(paper),
-                                    onToggleFavorite: () => widget.viewModel.toggleFavorite(paper.id),
-                                    onAddToProject: widget.onAddPaperToProject != null
-                                        ? () => widget.onAddPaperToProject?.call(paper)
+                                    onToggleFavorite: () => widget.viewModel
+                                        .toggleFavorite(paper.id),
+                                    onAddToProject:
+                                        widget.onAddPaperToProject != null
+                                        ? () => widget.onAddPaperToProject
+                                              ?.call(paper)
                                         : null,
                                   );
                                 },
@@ -198,10 +218,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                     padding: const EdgeInsets.only(bottom: 12),
                                     child: PaperCard(
                                       paper: paper,
-                                      onTap: () => widget.onPaperSelected(paper),
-                                      onToggleFavorite: () => widget.viewModel.toggleFavorite(paper.id),
-                                      onAddToProject: widget.onAddPaperToProject != null
-                                          ? () => widget.onAddPaperToProject?.call(paper)
+                                      onTap: () =>
+                                          widget.onPaperSelected(paper),
+                                      onToggleFavorite: () => widget.viewModel
+                                          .toggleFavorite(paper.id),
+                                      onAddToProject:
+                                          widget.onAddPaperToProject != null
+                                          ? () => widget.onAddPaperToProject
+                                                ?.call(paper)
                                           : null,
                                     ),
                                   );

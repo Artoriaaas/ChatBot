@@ -4,14 +4,14 @@ publish_to: 'none'
 version: 0.1.0+1
 
 environment:
-  sdk: ^3.13.3
+  sdk: ^3.13.2
 
 dependencies:
   flutter:
     sdk: flutter
-  google_fonts: ^6.2.1
+  google_fonts: ^8.2.1
   shared_preferences: ^2.5.0
-  flutter_markdown: ^0.7.7
+  flutter_markdown_plus: ^1.0.5
   path_provider: ^2.1.5
   file_picker: ^13.1.0
   http: ^1.2.0

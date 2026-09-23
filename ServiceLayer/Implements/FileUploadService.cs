@@ -9,7 +9,7 @@ namespace ServiceLayer.Implements
     {
         private readonly string _uploadFolderPath;
         private readonly long _maxFileSize;
-        private readonly string[] _allowedExtensions = { ".pdf", ".docx", ".ppt", ".pptx" };
+        private readonly string[] _allowedExtensions = { ".pdf", ".doc", ".docx", ".ppt", ".pptx" };
  
         public FileUploadService(string uploadFolderPath, long maxFileSize = 5242880) // 5MB default
         {
@@ -32,7 +32,7 @@ namespace ServiceLayer.Implements
                 var fileExtension = Path.GetExtension(fileName).ToLower();
                 if (Array.IndexOf(_allowedExtensions, fileExtension) < 0)
                 {
-                    return (false, null, $"File type {fileExtension} not supported. Allowed: PDF, DOCX, PPT, PPTX");
+                    return (false, null, $"File type {fileExtension} not supported. Allowed: PDF, DOC, DOCX, PPT, PPTX");
                 }
 
                 // Validate file size

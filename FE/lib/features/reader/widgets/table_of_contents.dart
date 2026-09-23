@@ -105,7 +105,7 @@ class TableOfContents extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              '${strings.pageAbbr} ${page.pageNumber + 1}',
+                              '${strings.pageAbbr} ${page.pageNumber}',
                               style: AppTypography.caption.copyWith(
                                 fontSize: 10,
                                 color: isSelected ? colors.primary : colors.textSecondary.withValues(alpha: 0.7),

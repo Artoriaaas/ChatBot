@@ -42,8 +42,15 @@ if (loadedEnvPath == null)
 
 var builder = WebApplication.CreateBuilder(args);
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? builder.Configuration["DefaultConnection"] 
+    ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
+    ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("DefaultConnection")
+    ?? "Host=localhost;Port=5432;Database=ChatBotDb;Username=postgres;Password=12345678;Trust Server Certificate=true";
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+    options.UseNpgsql(connectionString,
         o => o.UseVector())); 
 
 builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
@@ -232,7 +239,12 @@ builder.Services.AddCors(options =>
 builder.Services.AddRazorPages();
 builder.Services.AddSession();
 builder.Services.AddSignalR();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -247,15 +259,12 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Paper AI API v1");
-        c.RoutePrefix = "swagger";
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Paper AI API v1");
+    c.RoutePrefix = "swagger";
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
@@ -264,11 +273,10 @@ app.UseCors("AllowAll");
 
 app.MapRazorPages();
 app.MapControllers();
+app.MapGet("/", () => Results.Redirect("/swagger"));
 
-app.MapFallbackToPage("/Auth/Login");
 app.MapHub<ChatBot.Hubs.NotificationHub>("/notificationHub");
 
-//SeedDatabase(app);
 
 app.Run();
 

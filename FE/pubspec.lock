@@ -174,14 +174,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.0"
-  flutter_markdown:
+  flutter_markdown_plus:
     dependency: "direct main"
     description:
-      name: flutter_markdown
-      sha256: "08fb8315236099ff8e90cb87bb2b935e0a724a3af1623000a9cec930468e0f27"
+      name: flutter_markdown_plus
+      sha256: fce641d6c2106cc495de1cd603f97a4f9d615a97a64011928ded380dbdade935
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.7+1"
+    version: "1.0.12"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -196,10 +196,10 @@ packages:
     dependency: "direct main"
     description:
       name: google_fonts
-      sha256: ba03d03bcaa2f6cb7bd920e3b5027181db75ab524f8891c8bc3aa603885b8055
+      sha256: e3cb3ee6b47fd2472c23de6da5744796a4da195137759ddb3fbcc9467b7b3c7d
       url: "https://pub.dev"
     source: hosted
-    version: "6.3.3"
+    version: "8.2.1"
   hooks:
     dependency: transitive
     description:
@@ -614,5 +614,5 @@ packages:
     source: hosted
     version: "3.1.4"
 sdks:
-  dart: ">=3.13.3 <4.0.0"
+  dart: ">=3.13.2 <4.0.0"
   flutter: ">=3.44.0"

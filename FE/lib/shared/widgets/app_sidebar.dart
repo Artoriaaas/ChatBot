@@ -378,7 +378,7 @@ class _AppSidebarState extends State<AppSidebar> {
                                   IconButton(
                                     icon: Icon(Icons.logout_rounded, size: 16, color: colors.textSecondary),
                                     tooltip: strings.logout,
-                                    onPressed: () => widget.authVM?.logout(),
+                                    onPressed: () async => await widget.authVM?.logout(),
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                                   ),

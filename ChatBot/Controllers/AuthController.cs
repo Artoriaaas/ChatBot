@@ -12,6 +12,9 @@ using DataAccessLayer;
 using BusinessObject.Entities;
 using BusinessObject.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using System.Net.Mail;
+using System.Net;
 
 namespace ChatBot.Controllers
 {
@@ -21,11 +24,13 @@ namespace ChatBot.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly IMemoryCache _cache;
 
-        public AuthController(AppDbContext context, IConfiguration configuration)
+        public AuthController(AppDbContext context, IConfiguration configuration, IMemoryCache cache)
         {
             _context = context;
             _configuration = configuration;
+            _cache = cache;
         }
 
         [HttpPost("register")]
@@ -36,18 +41,39 @@ namespace ChatBot.Controllers
                 return BadRequest("Email đã được sử dụng.");
             }
 
-            var user = new User
+            var otp = new Random().Next(100000, 999999).ToString();
+            _cache.Set($"RegisterOTP_{request.Email}", otp, TimeSpan.FromMinutes(5));
+            _cache.Set($"RegisterData_{request.Email}", request, TimeSpan.FromMinutes(5));
+
+            await SendEmailAsync(request.Email, "Mã xác nhận đăng ký", $"Mã OTP của bạn là: {otp}");
+
+            return Ok(new { message = "Mã OTP đã được gửi đến email của bạn." });
+        }
+
+        [HttpPost("verify-register")]
+        public async Task<IActionResult> VerifyRegister([FromBody] VerifyOtpRequest request)
+        {
+            if (_cache.TryGetValue($"RegisterOTP_{request.Email}", out string? savedOtp) && savedOtp == request.Otp)
             {
-                Email = request.Email,
-                FullName = request.FullName,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = Role.Student // Default role
-            };
+                if (_cache.TryGetValue($"RegisterData_{request.Email}", out RegisterRequest? regData) && regData != null)
+                {
+                    var user = new User
+                    {
+                        Email = regData.Email,
+                        FullName = regData.FullName,
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(regData.Password),
+                        Role = Role.Student
+                    };
+                    _context.Users.Add(user);
+                    await _context.SaveChangesAsync();
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+                    _cache.Remove($"RegisterOTP_{request.Email}");
+                    _cache.Remove($"RegisterData_{request.Email}");
 
-            return Ok(new { message = "Đăng ký thành công" });
+                    return Ok(new { message = "Đăng ký thành công" });
+                }
+            }
+            return BadRequest("Mã OTP không hợp lệ hoặc đã hết hạn.");
         }
 
         [HttpPost("login")]
@@ -60,8 +86,28 @@ namespace ChatBot.Controllers
                 return Unauthorized("Email hoặc mật khẩu không đúng.");
             }
 
-            var token = GenerateJwtToken(user);
-            return Ok(new { token });
+            var otp = new Random().Next(100000, 999999).ToString();
+            _cache.Set($"LoginOTP_{request.Email}", otp, TimeSpan.FromMinutes(5));
+
+            await SendEmailAsync(request.Email, "Mã xác nhận đăng nhập", $"Mã OTP của bạn là: {otp}");
+
+            return Ok(new { message = "Mã OTP đã được gửi đến email. Vui lòng xác nhận để đăng nhập." });
+        }
+
+        [HttpPost("verify-login")]
+        public async Task<IActionResult> VerifyLogin([FromBody] VerifyOtpRequest request)
+        {
+            if (_cache.TryGetValue($"LoginOTP_{request.Email}", out string? savedOtp) && savedOtp == request.Otp)
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                if (user != null)
+                {
+                    var token = GenerateJwtToken(user);
+                    _cache.Remove($"LoginOTP_{request.Email}");
+                    return Ok(new { token });
+                }
+            }
+            return BadRequest("Mã OTP không hợp lệ hoặc đã hết hạn.");
         }
 
         [HttpGet("google-login")]
@@ -140,6 +186,40 @@ namespace ChatBot.Controllers
             return Ok(new { message = "Đăng nhập Google thành công", token });
         }
 
+        private async Task SendEmailAsync(string toEmail, string subject, string body)
+        {
+            var host = _configuration["Email:Host"];
+            var port = int.Parse(_configuration["Email:Port"] ?? "587");
+            var user = _configuration["Email:User"];
+            var pass = _configuration["Email:Pass"];
+
+            if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
+            {
+                return;
+            }
+
+            using var client = new SmtpClient(host, port)
+            {
+                Credentials = new NetworkCredential(user, pass),
+                EnableSsl = true
+            };
+
+            var mailMessage = new MailMessage
+            {
+                From = new MailAddress(user),
+                Subject = subject,
+                Body = body,
+                IsBodyHtml = true
+            };
+            mailMessage.To.Add(toEmail);
+
+            try
+            {
+                await client.SendMailAsync(mailMessage);
+            }
+            catch { }
+        }
+
         private string GenerateJwtToken(User user)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "ChatBotSuperSecretKeyThatIsVeryLongAndSecureForJWT123!@#"));
@@ -183,5 +263,11 @@ namespace ChatBot.Controllers
         public string FullName { get; set; } = string.Empty;
         public string? GoogleId { get; set; }
         public string? IdToken { get; set; }
+    }
+
+    public class VerifyOtpRequest
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Otp { get; set; } = string.Empty;
     }
 }

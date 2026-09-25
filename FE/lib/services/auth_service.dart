@@ -9,7 +9,7 @@ class AuthService {
   AuthService({http.Client? client}) : _client = client ?? http.Client();
 
   /// Đăng nhập bằng Email và Password
-  Future<String?> login(String email, String password) async {
+  Future<bool> login(String email, String password) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/Auth/login');
     final response = await _client.post(
       url,
@@ -21,17 +21,36 @@ class AuthService {
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final token = data['token'];
-      await saveToken(token);
-      return token;
+      return true;
     } else {
       throw Exception('Lỗi đăng nhập: ${response.body}');
     }
   }
 
+  /// Xác thực OTP Đăng nhập
+  Future<String?> verifyLogin(String email, String otp) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/Auth/verify-login');
+    final response = await _client.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'otp': otp,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final token = data['token'];
+      await saveToken(token);
+      return token;
+    } else {
+      throw Exception('Mã OTP không hợp lệ hoặc đã hết hạn.');
+    }
+  }
+
   /// Đăng ký tài khoản mới
-  Future<void> register(String name, String email, String password) async {
+  Future<bool> register(String name, String email, String password) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/Auth/register');
     final response = await _client.post(
       url,
@@ -43,8 +62,29 @@ class AuthService {
       }),
     );
 
-    if (response.statusCode != 200) {
+    if (response.statusCode == 200) {
+      return true;
+    } else {
       throw Exception('Lỗi đăng ký: ${response.body}');
+    }
+  }
+
+  /// Xác thực OTP Đăng ký
+  Future<bool> verifyRegister(String email, String otp) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/Auth/verify-register');
+    final response = await _client.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'otp': otp,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      throw Exception('Mã OTP không hợp lệ hoặc đã hết hạn.');
     }
   }
 

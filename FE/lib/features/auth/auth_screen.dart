@@ -47,18 +47,223 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submitForm() async {
     if (_activeTab == 0) {
-      await widget.authVM.loginWithEmail(
+      final success = await widget.authVM.loginWithEmail(
         _emailController.text,
         _passwordController.text,
       );
+      if (success && !widget.authVM.isLoggedIn && mounted) {
+        _showOtpDialog(_emailController.text, true);
+      }
     } else {
-      await widget.authVM.registerWithEmail(
+      final success = await widget.authVM.registerWithEmail(
         name: _nameController.text,
         email: _emailController.text,
         password: _passwordController.text,
         confirmPassword: _confirmPasswordController.text,
       );
+      if (success && mounted) {
+        _showOtpDialog(_emailController.text, false);
+      }
     }
+  }
+
+  void _showOtpDialog(String email, bool isLogin) {
+    final colors = AppColorsExtension.of(context);
+    final strings = widget.settingsVM.strings;
+    final otpController = TextEditingController();
+    bool isSubmitting = false;
+    String? localError;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: colors.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+              title: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Icon(Icons.verified_outlined, color: colors.primary, size: 20),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      isLogin ? 'Xác thực đăng nhập' : 'Xác thực đăng ký',
+                      style: AppTypography.heading3.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
+                        fontSize: 17,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: colors.primary.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.email_outlined, size: 16, color: colors.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Mã OTP 6 chữ số đã được gửi đến:\n$email',
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontSize: 12,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Nhập mã OTP',
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: otpController,
+                      keyboardType: TextInputType.number,
+                      autofocus: true,
+                      maxLength: 6,
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        letterSpacing: 6,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                      textAlign: TextAlign.center,
+                      decoration: InputDecoration(
+                        hintText: '------',
+                        hintStyle: TextStyle(
+                          color: colors.textSecondary.withValues(alpha: 0.3),
+                          letterSpacing: 6,
+                          fontSize: 20,
+                        ),
+                        counterText: '',
+                        errorText: localError,
+                        filled: true,
+                        fillColor: colors.appBackground,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: colors.divider),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: colors.primary, width: 2),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: colors.error),
+                        ),
+                      ),
+                      onChanged: (_) => setDialogState(() => localError = null),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
+                  child: Text(strings.cancel, style: TextStyle(color: colors.textSecondary)),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final otp = otpController.text.trim();
+                          if (otp.length < 6) {
+                            setDialogState(() => localError = 'Vui lòng nhập đủ 6 chữ số');
+                            return;
+                          }
+                          setDialogState(() => isSubmitting = true);
+
+                          bool success = false;
+                          if (isLogin) {
+                            // Đăng nhập: verify OTP → nhận JWT → isLoggedIn = true
+                            success = await widget.authVM.verifyLoginOtp(email, otp);
+                          } else {
+                            // Đăng ký: verify OTP đăng ký → tạo user → gửi OTP đăng nhập
+                            success = await widget.authVM.verifyRegisterOtp(
+                              email,
+                              otp,
+                              _passwordController.text,
+                            );
+                          }
+
+                          if (!dialogContext.mounted) return;
+
+                          if (isLogin && success) {
+                            // Đăng nhập OK → đóng dialog, vào app
+                            Navigator.pop(dialogContext);
+                          } else if (!isLogin && success) {
+                            // Đăng ký OK → đóng dialog này, hiện OTP đăng nhập
+                            Navigator.pop(dialogContext);
+                            if (mounted) {
+                              _showOtpDialog(email, true);
+                            }
+                          } else {
+                            setDialogState(() {
+                              isSubmitting = false;
+                              localError = widget.authVM.errorMessage ??
+                                  'OTP không hợp lệ hoặc đã hết hạn';
+                            });
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primary,
+                    foregroundColor: colors.onPrimary,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Xác nhận', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showForgotPasswordDialog() {
@@ -692,72 +897,6 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-
-                          // Google Auth Button
-                          OutlinedButton(
-                            onPressed: widget.authVM.isLoading ? null : () => widget.authVM.loginWithGoogle(),
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: colors.surface,
-                              foregroundColor: colors.textPrimary,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: BorderSide(color: colors.divider),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Google G Icon
-                                Container(
-                                  width: 20,
-                                  height: 20,
-                                  alignment: Alignment.center,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white,
-                                  ),
-                                  child: const Text(
-                                    'G',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blueAccent,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  strings.continueWithGoogle,
-                                  style: AppTypography.body.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.textPrimary,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Divider: - HOẶC BẰNG EMAIL -
-                          Row(
-                            children: [
-                              Expanded(child: Divider(color: colors.divider)),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  strings.orWithEmail,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.8,
-                                    color: colors.textSecondary.withValues(alpha: 0.7),
-                                  ),
-                                ),
-                              ),
-                              Expanded(child: Divider(color: colors.divider)),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
 
                           // Error Message Banner if any
                           if (widget.authVM.errorMessage != null) ...[

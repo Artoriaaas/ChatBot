@@ -1,11 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:paper_chat/models/user_profile.dart';
 import 'package:paper_chat/services/auth_service.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   bool _isLoggedIn = false;
   bool _isLoading = false;
@@ -22,22 +20,36 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Xóa token cũ khi khởi động app để bắt buộc đăng nhập lại
+  Future<void> clearSession() async {
+    await _authService.logout();
+    _isLoggedIn = false;
+    _currentUser = null;
+    notifyListeners();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // ĐĂNG NHẬP – Bước 1: gửi email + password lên backend
+  // Backend kiểm tra tài khoản + mật khẩu BCrypt, nếu đúng → gửi OTP
+  // Trả về true = OTP đã gửi (UI cần hiện dialog nhập OTP)
+  // Trả về false = sai email/mật khẩu hoặc lỗi mạng
+  // ─────────────────────────────────────────────────────────────
   Future<bool> loginWithEmail(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    // Simulate network delay for authenticating
-    await Future.delayed(const Duration(milliseconds: 600));
+    final trimmedEmail = email.trim();
+    final trimmedPass = password.trim();
 
-    if (email.trim().isEmpty || !email.contains('@')) {
-      _errorMessage = 'Email không hợp lệ. Vui lòng kiểm tra lại.';
+    if (trimmedEmail.isEmpty || !trimmedEmail.contains('@')) {
+      _errorMessage = 'Email không hợp lệ.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
 
-    if (password.length < 6) {
+    if (trimmedPass.length < 6) {
       _errorMessage = 'Mật khẩu phải có ít nhất 6 ký tự.';
       _isLoading = false;
       notifyListeners();
@@ -45,34 +57,66 @@ class AuthViewModel extends ChangeNotifier {
     }
 
     try {
-      final token = await _authService.login(email.trim(), password);
-      
-      if (token != null) {
-        // Here we could decode JWT to get user info, but for now we just create a UserProfile
-        final nameFromEmail = email.split('@').first;
-        final formattedName = nameFromEmail[0].toUpperCase() + nameFromEmail.substring(1);
-        
+      // Gọi API: backend verify password BCrypt, nếu đúng mới gửi OTP
+      final otpSent = await _authService.login(trimmedEmail, trimmedPass);
+      _isLoading = false;
+      notifyListeners();
+      return otpSent;
+    } catch (e) {
+      // Backend trả 401 = sai email/mật khẩu → throw Exception
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // ĐĂNG NHẬP – Bước 2: xác thực OTP, nhận JWT token
+  // Trả về true = đăng nhập thành công, isLoggedIn = true
+  // Trả về false = OTP sai hoặc hết hạn
+  // ─────────────────────────────────────────────────────────────
+  Future<bool> verifyLoginOtp(String email, String otp) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final token = await _authService.verifyLogin(email.trim(), otp.trim());
+      if (token != null && token.isNotEmpty) {
+        final namePart = email.split('@').first;
+        final displayName = namePart[0].toUpperCase() + namePart.substring(1);
         _currentUser = UserProfile(
           id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
-          name: formattedName,
+          name: displayName,
           email: email.trim(),
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          avatarUrl:
+              'https://ui-avatars.com/api/?name=${Uri.encodeComponent(displayName)}&background=6366f1&color=fff&bold=true',
           isGoogleAuth: false,
         );
         _isLoggedIn = true;
+        _isLoading = false;
+        notifyListeners();
+        return true;
       }
+      _errorMessage = 'Xác thực thất bại, vui lòng thử lại.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
       return false;
     }
-
-    _isLoading = false;
-    notifyListeners();
-    return true;
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // ĐĂNG KÝ – Bước 1: gửi thông tin tài khoản lên backend
+  // Backend lưu tạm thông tin + gửi OTP qua email
+  // Trả về true = OTP đã gửi
+  // Trả về false = email đã tồn tại hoặc lỗi
+  // ─────────────────────────────────────────────────────────────
   Future<bool> registerWithEmail({
     required String name,
     required String email,
@@ -83,41 +127,37 @@ class AuthViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 700));
-
     if (name.trim().isEmpty) {
-      _errorMessage = 'Vui lòng nhập họ và tên của bạn.';
+      _errorMessage = 'Vui lòng nhập họ và tên.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
-
     if (email.trim().isEmpty || !email.contains('@')) {
       _errorMessage = 'Email không hợp lệ.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
-
     if (password.length < 6) {
-      _errorMessage = 'Mật khẩu phải có từ 6 ký tự trở lên.';
+      _errorMessage = 'Mật khẩu phải từ 6 ký tự trở lên.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
-
     if (password != confirmPassword) {
-      _errorMessage = 'Mật khẩu xác nhận không trùng khớp.';
+      _errorMessage = 'Mật khẩu xác nhận không khớp.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
 
     try {
-      await _authService.register(name.trim(), email.trim(), password);
-      
-      // Auto login after register
-      return await loginWithEmail(email.trim(), password);
+      final otpSent =
+          await _authService.register(name.trim(), email.trim(), password);
+      _isLoading = false;
+      notifyListeners();
+      return otpSent;
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
@@ -126,70 +166,82 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> loginWithGoogle() async {
+  // ─────────────────────────────────────────────────────────────
+  // ĐĂNG KÝ – Bước 2: xác thực OTP để hoàn tất tạo tài khoản
+  // Sau khi verify xong → gọi login để gửi OTP đăng nhập
+  // Trả về true = user đã được tạo + OTP đăng nhập đã gửi
+  // ─────────────────────────────────────────────────────────────
+  Future<bool> verifyRegisterOtp(
+      String email, String otp, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
+      // Xác nhận OTP → backend tạo user trong database
+      final registered =
+          await _authService.verifyRegister(email.trim(), otp.trim());
+      if (!registered) {
+        _errorMessage = 'OTP không hợp lệ hoặc đã hết hạn.';
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      final token = await _authService.loginWithGoogle(
-        googleUser.email,
-        googleUser.displayName ?? googleUser.email.split('@').first,
-        googleUser.id,
-        googleAuth.idToken,
-      );
-
-      if (token != null) {
-        _currentUser = UserProfile(
-          id: googleUser.id,
-          name: googleUser.displayName ?? googleUser.email.split('@').first,
-          email: googleUser.email,
-          avatarUrl: googleUser.photoUrl ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-          isGoogleAuth: true,
-        );
-        _isLoggedIn = true;
-      }
+      // Sau đăng ký xong → gửi OTP đăng nhập (sẽ hiện dialog OTP lần 2)
+      final loginOtpSent =
+          await _authService.login(email.trim(), password);
+      _isLoading = false;
+      notifyListeners();
+      return loginOtpSent;
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
       return false;
     }
-
-    _isLoading = false;
-    notifyListeners();
-    return true;
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // ĐĂNG XUẤT
+  // ─────────────────────────────────────────────────────────────
+  Future<void> logout() async {
+    await _authService.logout();
+    _isLoggedIn = false;
+    _currentUser = null;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // QUÊN MẬT KHẨU – Bước 1: gửi OTP reset về email
+  // TODO: Cần backend endpoint /Auth/forgot-password
+  // ─────────────────────────────────────────────────────────────
   Future<bool> sendPasswordResetOtp(String email) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 600));
-
     final trimmed = email.trim();
     if (trimmed.isEmpty || !trimmed.contains('@') || !trimmed.contains('.')) {
-      _errorMessage = 'Email không hợp lệ. Vui lòng kiểm tra lại.';
+      _errorMessage = 'Email không hợp lệ.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
 
+    // TODO: Gọi API khi backend có endpoint này
+    await Future.delayed(const Duration(milliseconds: 500));
+    _errorMessage = 'Tính năng đang phát triển. Vui lòng liên hệ quản trị viên.';
     _isLoading = false;
     notifyListeners();
-    return true;
+    return false;
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // QUÊN MẬT KHẨU – Bước 2: xác thực OTP + đặt mật khẩu mới
+  // TODO: Cần backend endpoint /Auth/reset-password
+  // ─────────────────────────────────────────────────────────────
   Future<bool> verifyOtpAndResetPassword({
     required String email,
     required String otp,
@@ -200,42 +252,24 @@ class AuthViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 700));
-
-    final trimmedOtp = otp.trim();
-    if (trimmedOtp.isEmpty || trimmedOtp != '123456') {
-      _errorMessage = 'Mã xác thực không chính xác (Mã thử nghiệm: 123456).';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-
     if (newPassword.length < 6) {
       _errorMessage = 'Mật khẩu mới phải có ít nhất 6 ký tự.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
-
     if (newPassword != confirmPassword) {
-      _errorMessage = 'Mật khẩu xác nhận không trùng khớp.';
+      _errorMessage = 'Mật khẩu xác nhận không khớp.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
 
+    // TODO: Gọi API khi backend có endpoint này
+    await Future.delayed(const Duration(milliseconds: 500));
+    _errorMessage = 'Tính năng đang phát triển. Vui lòng liên hệ quản trị viên.';
     _isLoading = false;
     notifyListeners();
-    return true;
-  }
-
-  void logout() {
-    _authService.logout();
-    _googleSignIn.signOut();
-    _isLoggedIn = false;
-    _currentUser = null;
-    _errorMessage = null;
-    notifyListeners();
+    return false;
   }
 }
-

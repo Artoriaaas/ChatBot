@@ -37,6 +37,8 @@ void main() async {
   
   // Create view models
   final authVM = AuthViewModel();
+  // Xóa token cũ khi khởi động - bắt buộc đăng nhập lại mỗi phiên
+  await authVM.clearSession();
   final settingsVM = SettingsViewModel(settingsRepo);
   final libraryVM = LibraryViewModel(paperRepo);
   final readerVM = ReaderViewModel();

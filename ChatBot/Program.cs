@@ -19,7 +19,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
     ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
     ?? Environment.GetEnvironmentVariable("DefaultConnection")
-    ?? "Host=localhost;Port=5432;Database=ChatBotDb;Username=postgres;Password=12345678;Trust Server Certificate=true";
+    ?? "Host=localhost;Port=5432;Database=PaperdeskDb;Username=postgres;Password=12345;Trust Server Certificate=true";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString,

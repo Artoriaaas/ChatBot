@@ -67,11 +67,11 @@ namespace ServiceLayer.Implements
             var paper = new Paper
             {
                 Title = paperTitle,
-                Authors = authors ?? "Chưa rõ tác giả",
+                Authors = string.IsNullOrWhiteSpace(authors) ? "Chưa rõ tác giả" : authors.Trim(),
                 Year = year ?? DateTime.UtcNow.Year,
-                Collection = string.IsNullOrWhiteSpace(collection) ? "Tài liệu Backend" : collection,
-                Tags = tags ?? "Research",
-                AbstractText = abstractText ?? $"Bài báo nghiên cứu {paperTitle}.",
+                Collection = string.IsNullOrWhiteSpace(collection) ? "Tài liệu Backend" : collection.Trim(),
+                Tags = string.IsNullOrWhiteSpace(tags) ? "Research" : tags.Trim(),
+                AbstractText = string.IsNullOrWhiteSpace(abstractText) ? $"Bài báo nghiên cứu {paperTitle}." : abstractText.Trim(),
                 FilePath = filePath,
                 FileSize = fileSize,
                 IndexStatus = "Pending",
@@ -196,6 +196,13 @@ namespace ServiceLayer.Implements
                 existed.Tags = paper.Tags;
                 existed.AbstractText = paper.AbstractText;
                 existed.IsFavorite = paper.IsFavorite;
+                existed.Journal = paper.Journal;
+                existed.Publisher = paper.Publisher;
+                existed.Doi = paper.Doi;
+                existed.Volume = paper.Volume;
+                existed.Issue = paper.Issue;
+                existed.Pages = paper.Pages;
+                existed.Keywords = paper.Keywords;
                 await _paperRepository.UpdateAsync(existed);
             }
 

@@ -7,6 +7,8 @@ class ReaderToolbar extends StatelessWidget {
   final SettingsViewModel settingsVM;
   final VoidCallback onToggleToc;
   final bool isTocOpen;
+  final VoidCallback? onToggleInfo;
+  final bool isInfoOpen;
   final int currentPage;
   final int totalPages;
   final ValueChanged<int> onGoToPage;
@@ -32,6 +34,8 @@ class ReaderToolbar extends StatelessWidget {
     required this.settingsVM,
     required this.onToggleToc,
     required this.isTocOpen,
+    this.onToggleInfo,
+    this.isInfoOpen = false,
     required this.currentPage,
     required this.totalPages,
     required this.onGoToPage,
@@ -101,6 +105,36 @@ class ReaderToolbar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
+
+              // Paper Info Toggle Button
+              if (onToggleInfo != null) ...[
+                Tooltip(
+                  message: strings.paperInfo,
+                  child: TextButton.icon(
+                    onPressed: onToggleInfo,
+                    icon: Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: isInfoOpen ? colors.primary : colors.textSecondary,
+                    ),
+                    label: Text(
+                      strings.paperInfo,
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: isInfoOpen ? FontWeight.w600 : FontWeight.w400,
+                        color: isInfoOpen ? colors.primary : colors.textPrimary,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: isInfoOpen ? colors.selectionBackground : Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
 
               // Search in PDF input box
               SizedBox(

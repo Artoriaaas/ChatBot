@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:paper_chat/app/theme/app_colors.dart';
 import 'package:paper_chat/app/theme/motion.dart';
+import 'package:paper_chat/features/reader/widgets/edit_paper_metadata_dialog.dart';
 import 'package:paper_chat/models/paper.dart';
 
 class PaperCard extends StatefulWidget {
@@ -9,6 +10,7 @@ class PaperCard extends StatefulWidget {
   final VoidCallback onToggleFavorite;
   final VoidCallback? onAddToProject;
   final VoidCallback? onDelete;
+  final VoidCallback? onMetadataUpdated;
 
   const PaperCard({
     super.key,
@@ -17,6 +19,7 @@ class PaperCard extends StatefulWidget {
     required this.onToggleFavorite,
     this.onAddToProject,
     this.onDelete,
+    this.onMetadataUpdated,
   });
 
   @override
@@ -113,6 +116,28 @@ class _PaperCardState extends State<PaperCard> {
                         ),
                       ),
                     ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.info_outline,
+                      color: colors.textSecondary.withValues(alpha: 0.8),
+                      size: 19,
+                    ),
+                    onPressed: () async {
+                      final updated = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => EditPaperMetadataDialog(
+                          paper: widget.paper,
+                        ),
+                      );
+                      if (updated == true && mounted) {
+                        setState(() {});
+                        widget.onMetadataUpdated?.call();
+                      }
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Thông tin & Metadata bài báo',
+                  ),
                   const SizedBox(width: 4),
                   IconButton(
                     icon: Icon(
@@ -153,6 +178,44 @@ class _PaperCardState extends State<PaperCard> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
+              if ((widget.paper.journal != null && widget.paper.journal!.isNotEmpty) ||
+                  (widget.paper.doi != null && widget.paper.doi!.isNotEmpty)) ...[
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    if (widget.paper.journal != null && widget.paper.journal!.isNotEmpty) ...[
+                      Icon(Icons.menu_book, size: 11, color: colors.textSecondary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          widget.paper.journal!,
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    if (widget.paper.doi != null && widget.paper.doi!.isNotEmpty) ...[
+                      if (widget.paper.journal != null && widget.paper.journal!.isNotEmpty)
+                        Text(' • ', style: TextStyle(color: colors.textSecondary, fontSize: 11)),
+                      Text(
+                        'DOI: ${widget.paper.doi!}',
+                        style: TextStyle(
+                          color: colors.primary.withValues(alpha: 0.85),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               if (widget.paper.indexStatus != 'Completed') ...[
                 Row(

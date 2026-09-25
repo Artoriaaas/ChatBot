@@ -4,6 +4,7 @@ import 'package:paper_chat/features/chat/chat_panel.dart';
 import 'package:paper_chat/features/chat/chat_view_model.dart';
 import 'package:paper_chat/features/notes/widgets/minimizable_note_editor.dart';
 import 'package:paper_chat/features/reader/reader_view_model.dart';
+import 'package:paper_chat/features/reader/widgets/paper_info_panel.dart';
 import 'package:paper_chat/features/reader/widgets/reader_pane.dart';
 import 'package:paper_chat/features/reader/widgets/reader_toolbar.dart';
 import 'package:paper_chat/features/reader/widgets/table_of_contents.dart';
@@ -43,8 +44,10 @@ class ReaderScreen extends StatefulWidget {
 
 class _ReaderScreenState extends State<ReaderScreen> {
   double _tocWidth = 220;
+  double _infoWidth = 280;
   double _chatWidth = 400;
   bool _isTocOpen = false;
+  bool _isInfoOpen = false;
   bool _isHighlightMode = false;
   int _activeNarrowTab = 0; // 0=reader, 1=chat (for narrow mode)
   bool _isEditingNote = false;
@@ -137,6 +140,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 if (_isTocOpen) {
                   setState(() => _isTocOpen = false);
                 }
+                if (_isInfoOpen) {
+                  setState(() => _isInfoOpen = false);
+                }
                 widget.readerViewModel.clearSelection();
               },
             },
@@ -147,8 +153,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   listenable: widget.readerViewModel,
                   builder: (context, _) => ReaderToolbar(
                     settingsVM: widget.settingsViewModel,
-                    onToggleToc: () => setState(() => _isTocOpen = !_isTocOpen),
+                    onToggleToc: () => setState(() {
+                      _isTocOpen = !_isTocOpen;
+                      if (_isTocOpen) _isInfoOpen = false;
+                    }),
                     isTocOpen: _isTocOpen,
+                    onToggleInfo: () => setState(() {
+                      _isInfoOpen = !_isInfoOpen;
+                      if (_isInfoOpen) _isTocOpen = false;
+                    }),
+                    isInfoOpen: _isInfoOpen,
                     currentPage: widget.readerViewModel.currentPage,
                     totalPages: widget.readerViewModel.totalPages,
                     onGoToPage: widget.readerViewModel.goToPage,
@@ -171,7 +185,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                 ),
 
-                // Main Split Region (TOC Popover -> PDF Reader Pane -> Splitter -> Chat Panel)
+                // Main Split Region (TOC Popover -> Info Panel -> PDF Reader Pane -> Splitter -> Chat Panel)
                 Expanded(
                   child: Row(
                     children: [
@@ -196,6 +210,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           onDragUpdate: (delta) {
                             setState(() {
                               _tocWidth = (_tocWidth + delta).clamp(180.0, 320.0);
+                            });
+                          },
+                        ),
+                      ],
+
+                      // Paper Info Panel (collapsible side panel style)
+                      if (_isInfoOpen && !isNarrow) ...[
+                        SizedBox(
+                          width: _infoWidth,
+                          child: PaperInfoPanel(
+                            settingsVM: widget.settingsViewModel,
+                            paper: widget.paper,
+                            onClose: () => setState(() => _isInfoOpen = false),
+                            onPaperUpdated: (_) => setState(() {}),
+                          ),
+                        ),
+                        VerticalDragHandle(
+                          onDragUpdate: (delta) {
+                            setState(() {
+                              _infoWidth = (_infoWidth + delta).clamp(220.0, 420.0);
                             });
                           },
                         ),

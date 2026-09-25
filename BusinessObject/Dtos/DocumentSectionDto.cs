@@ -17,6 +17,13 @@ namespace BusinessObject.Dtos
         public string? Authors { get; set; }
         public string? AbstractText { get; set; }
         public int? Year { get; set; }
+        public string? Journal { get; set; }
+        public string? Publisher { get; set; }
+        public string? Doi { get; set; }
+        public string? Volume { get; set; }
+        public string? Issue { get; set; }
+        public string? Pages { get; set; }
+        public string? Keywords { get; set; }
         public int TotalPages { get; set; } = 1;
         public List<DocumentSectionDto> Sections { get; set; } = new();
         public string? ErrorMessage { get; set; }

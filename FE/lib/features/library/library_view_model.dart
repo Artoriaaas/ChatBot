@@ -130,6 +130,17 @@ class LibraryViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> updatePaper(Paper paper) async {
+    try {
+      await _repo.updatePaper(paper);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error updating paper: $e');
+      return false;
+    }
+  }
+
   Future<void> uploadPaper(
     List<int> bytes,
     String fileName, {

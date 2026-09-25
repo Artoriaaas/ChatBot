@@ -88,17 +88,31 @@ namespace ServiceLayer.Implements
                     if (linkedPaper != null)
                     {
                         if (!string.IsNullOrWhiteSpace(extractionResult.Title) && 
-                            (string.IsNullOrWhiteSpace(linkedPaper.Title) || linkedPaper.Title == Path.GetFileNameWithoutExtension(document.FileName)))
+                            (string.IsNullOrWhiteSpace(linkedPaper.Title) 
+                             || linkedPaper.Title == Path.GetFileNameWithoutExtension(document.FileName)
+                             || linkedPaper.Title == document.FileName
+                             || linkedPaper.Title == "Tài liệu nghiên cứu mới"
+                             || linkedPaper.Title == "Bài báo không tiêu đề"))
                         {
                             linkedPaper.Title = extractionResult.Title;
                         }
                         if (!string.IsNullOrWhiteSpace(extractionResult.Authors) && 
-                            (string.IsNullOrWhiteSpace(linkedPaper.Authors) || linkedPaper.Authors == "Chưa rõ tác giả"))
+                            (string.IsNullOrWhiteSpace(linkedPaper.Authors) 
+                             || linkedPaper.Authors == "Chưa rõ tác giả"
+                             || linkedPaper.Authors == "Tác giả chưa rõ"
+                             || linkedPaper.Authors == "Research Author"
+                             || linkedPaper.Authors == "Nghiên cứu viên"
+                             || linkedPaper.Authors == "Tài liệu tải lên"
+                             || linkedPaper.Authors == "Unknown Author"))
                         {
                             linkedPaper.Authors = extractionResult.Authors;
                         }
                         if (!string.IsNullOrWhiteSpace(extractionResult.AbstractText) && 
-                            (string.IsNullOrWhiteSpace(linkedPaper.AbstractText) || linkedPaper.AbstractText.StartsWith("Bài báo nghiên cứu")))
+                            (string.IsNullOrWhiteSpace(linkedPaper.AbstractText) 
+                             || linkedPaper.AbstractText.StartsWith("Bài báo nghiên cứu")
+                             || linkedPaper.AbstractText == "Đang chờ hệ thống trích xuất nội dung."
+                             || linkedPaper.AbstractText == "Đang xử lý..."
+                             || linkedPaper.AbstractText == "Chưa có tóm tắt."))
                         {
                             linkedPaper.AbstractText = extractionResult.AbstractText;
                         }
@@ -109,6 +123,46 @@ namespace ServiceLayer.Implements
                         if (extractionResult.TotalPages > 0)
                         {
                             linkedPaper.TotalPages = extractionResult.TotalPages;
+                        }
+                        if (!string.IsNullOrWhiteSpace(extractionResult.Journal))
+                        {
+                            linkedPaper.Journal = extractionResult.Journal;
+                        }
+                        if (!string.IsNullOrWhiteSpace(extractionResult.Publisher))
+                        {
+                            linkedPaper.Publisher = extractionResult.Publisher;
+                        }
+                        if (!string.IsNullOrWhiteSpace(extractionResult.Doi))
+                        {
+                            linkedPaper.Doi = extractionResult.Doi;
+                        }
+                        if (!string.IsNullOrWhiteSpace(extractionResult.Volume))
+                        {
+                            linkedPaper.Volume = extractionResult.Volume;
+                        }
+                        if (!string.IsNullOrWhiteSpace(extractionResult.Issue))
+                        {
+                            linkedPaper.Issue = extractionResult.Issue;
+                        }
+                        if (!string.IsNullOrWhiteSpace(extractionResult.Pages))
+                        {
+                            linkedPaper.Pages = extractionResult.Pages;
+                        }
+                        if (!string.IsNullOrWhiteSpace(extractionResult.Keywords))
+                        {
+                            linkedPaper.Keywords = extractionResult.Keywords;
+                            if (string.IsNullOrWhiteSpace(linkedPaper.Tags) 
+                                || linkedPaper.Tags == "Research"
+                                || linkedPaper.Tags == "Chưa phân loại"
+                                || linkedPaper.Tags == "PDF"
+                                || linkedPaper.Tags == "DOCX"
+                                || linkedPaper.Tags == "DOC"
+                                || linkedPaper.Tags == "DOCUMENT"
+                                || linkedPaper.Tags == "AI, LLM"
+                                || linkedPaper.Tags == "Backend")
+                            {
+                                linkedPaper.Tags = extractionResult.Keywords;
+                            }
                         }
 
                         await _context.SaveChangesAsync();

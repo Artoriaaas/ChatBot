@@ -21,6 +21,13 @@ class MockPaperRepository {
     _papers.removeWhere((p) => p.id == id);
   }
 
+  Future<void> updatePaper(Paper paper) async {
+    final index = _papers.indexWhere((p) => p.id == paper.id);
+    if (index != -1) {
+      _papers[index] = paper;
+    }
+  }
+
   static final List<Paper> _papers = [
     Paper(
       id: 'attention',

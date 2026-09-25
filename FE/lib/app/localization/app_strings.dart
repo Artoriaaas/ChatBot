@@ -56,6 +56,17 @@ class AppStrings {
   String get tableOfContents => isVi ? 'Mục lục' : 'Contents';
   String get tocHeader => isVi ? 'Mục lục tài liệu' : 'Table of Contents';
   String get closeToc => isVi ? 'Đóng mục lục' : 'Close Contents';
+  String get paperInfo => isVi ? 'Thông tin bài báo' : 'Paper Info';
+  String get metadataDetails => isVi ? 'Chi tiết Metadata' : 'Metadata Details';
+  String get journalOrVenue => isVi ? 'Tạp chí / Hội nghị' : 'Journal / Venue';
+  String get publisherLabel => isVi ? 'Nhà xuất bản' : 'Publisher';
+  String get doiLabel => isVi ? 'Mã định danh DOI' : 'DOI';
+  String get volumeLabel => isVi ? 'Tập (Volume)' : 'Volume';
+  String get issueLabel => isVi ? 'Số (Issue)' : 'Issue';
+  String get pagesLabel => isVi ? 'Số trang' : 'Pages';
+  String get keywordsLabel => isVi ? 'Từ khóa' : 'Keywords';
+  String get editMetadata => isVi ? 'Chỉnh sửa thông tin' : 'Edit Metadata';
+  String get metadataSaved => isVi ? 'Đã lưu thông tin bài báo' : 'Metadata saved successfully';
   String get searchInPdf => isVi ? 'Tìm trong PDF' : 'Search in PDF';
   String get fitWidth => isVi ? 'Vừa chiều rộng' : 'Fit width';
   String get highlight => isVi ? 'Tô sáng' : 'Highlight';

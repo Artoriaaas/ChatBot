@@ -184,6 +184,101 @@ namespace ServiceLayer.Implements
                 }
                 result.AbstractText = abstractBuilder.ToString().Trim();
 
+                // 4.1 Trích xuất Tạp chí / Hội nghị & Thông tin xuất bản (Journal / Monograph)
+                var monogrNode = doc.Descendants(ns + "sourceDesc").Descendants(ns + "monogr").FirstOrDefault()
+                    ?? doc.Descendants(ns + "monogr").FirstOrDefault();
+
+                if (monogrNode != null)
+                {
+                    var journalTitle = monogrNode.Elements(ns + "title")
+                        .FirstOrDefault(t => (string?)t.Attribute("level") == "j" || (string?)t.Attribute("level") == "m")?.Value
+                        ?? monogrNode.Elements(ns + "title").FirstOrDefault()?.Value;
+
+                    if (!string.IsNullOrWhiteSpace(journalTitle))
+                    {
+                        result.Journal = CleanWhitespace(journalTitle);
+                    }
+
+                    var publisherNode = monogrNode.Descendants(ns + "publisher").FirstOrDefault()
+                        ?? doc.Descendants(ns + "publicationStmt").Descendants(ns + "publisher").FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(publisherNode?.Value))
+                    {
+                        result.Publisher = CleanWhitespace(publisherNode.Value);
+                    }
+
+                    var volumeScope = monogrNode.Descendants(ns + "biblScope")
+                        .FirstOrDefault(b => (string?)b.Attribute("unit") == "volume");
+                    if (!string.IsNullOrWhiteSpace(volumeScope?.Value))
+                    {
+                        result.Volume = volumeScope.Value.Trim();
+                    }
+
+                    var issueScope = monogrNode.Descendants(ns + "biblScope")
+                        .FirstOrDefault(b => (string?)b.Attribute("unit") == "issue");
+                    if (!string.IsNullOrWhiteSpace(issueScope?.Value))
+                    {
+                        result.Issue = issueScope.Value.Trim();
+                    }
+
+                    var pageScope = monogrNode.Descendants(ns + "biblScope")
+                        .FirstOrDefault(b => (string?)b.Attribute("unit") == "page");
+                    if (pageScope != null)
+                    {
+                        var from = (string?)pageScope.Attribute("from");
+                        var to = (string?)pageScope.Attribute("to");
+                        if (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(to))
+                        {
+                            result.Pages = $"{from.Trim()}–{to.Trim()}";
+                        }
+                        else if (!string.IsNullOrWhiteSpace(pageScope.Value))
+                        {
+                            result.Pages = pageScope.Value.Trim();
+                        }
+                    }
+
+                    // Fallback tìm năm trong imprint date nếu chưa tìm thấy
+                    if (!result.Year.HasValue)
+                    {
+                        var imprintDate = monogrNode.Descendants(ns + "date").FirstOrDefault();
+                        if (imprintDate != null)
+                        {
+                            var whenAttr = (string?)imprintDate.Attribute("when");
+                            if (!string.IsNullOrEmpty(whenAttr) && Regex.Match(whenAttr, @"\b(19\d{2}|20\d{2})\b") is { Success: true } m)
+                            {
+                                if (int.TryParse(m.Value, out int yr)) result.Year = yr;
+                            }
+                            else if (Regex.Match(imprintDate.Value, @"\b(19\d{2}|20\d{2})\b") is { Success: true } tm)
+                            {
+                                if (int.TryParse(tm.Value, out int yr)) result.Year = yr;
+                            }
+                        }
+                    }
+                }
+
+                // 4.2 Trích xuất DOI
+                var doiNode = doc.Descendants(ns + "idno")
+                    .FirstOrDefault(n => string.Equals((string?)n.Attribute("type"), "DOI", StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrWhiteSpace(doiNode?.Value))
+                {
+                    result.Doi = CleanWhitespace(doiNode.Value);
+                }
+
+                // 4.3 Trích xuất Từ khóa (Keywords)
+                var keywordNodes = doc.Descendants(ns + "keywords").Descendants(ns + "term");
+                var keywordList = new List<string>();
+                foreach (var kw in keywordNodes)
+                {
+                    var text = CleanWhitespace(kw.Value);
+                    if (!string.IsNullOrWhiteSpace(text) && !keywordList.Contains(text, StringComparer.OrdinalIgnoreCase))
+                    {
+                        keywordList.Add(text);
+                    }
+                }
+                if (keywordList.Any())
+                {
+                    result.Keywords = string.Join(", ", keywordList);
+                }
+
                 // 5. Trích xuất các Mục (Sections)
                 // 5. Trích xuất các Mục (Sections) với Gom nhóm phân cấp (Hierarchical Grouping - Cách 1)
                 var sections = new List<DocumentSectionDto>();

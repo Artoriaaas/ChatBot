@@ -40,6 +40,20 @@ namespace BusinessObject.Entities
 
         public string? ErrorMessage { get; set; }
 
+        public string? Journal { get; set; }
+
+        public string? Publisher { get; set; }
+
+        public string? Doi { get; set; }
+
+        public string? Volume { get; set; }
+
+        public string? Issue { get; set; }
+
+        public string? Pages { get; set; }
+
+        public string? Keywords { get; set; }
+
         public int? DocumentId { get; set; }
 
         [ForeignKey("DocumentId")]

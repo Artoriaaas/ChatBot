@@ -84,6 +84,61 @@ namespace ChatBot.Controllers
             }
         }
 
+        [HttpGet("{id}/metadata")]
+        public async Task<IActionResult> GetPaperMetadata(int id)
+        {
+            try
+            {
+                var paper = await _paperService.GetByIdAsync(id);
+                if (paper == null)
+                    return NotFound(new { message = "Không tìm thấy bài báo." });
+
+                return Ok(new
+                {
+                    paper.Id,
+                    paper.Title,
+                    paper.Authors,
+                    paper.Year,
+                    paper.Journal,
+                    paper.Publisher,
+                    paper.Doi,
+                    paper.Volume,
+                    paper.Issue,
+                    paper.Pages,
+                    paper.AbstractText,
+                    paper.Keywords,
+                    paper.Tags,
+                    paper.Collection,
+                    paper.TotalPages,
+                    paper.IndexStatus,
+                    paper.CreatedAt,
+                    paper.FileSize
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdatePaper(int id, [FromBody] Paper paper)
+        {
+            try
+            {
+                paper.Id = id;
+                var (success, message) = await _paperService.SavePaperAsync(paper);
+                if (!success)
+                    return BadRequest(new { message });
+
+                return Ok(new { message, paper });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
         [HttpPost]
         public async Task<IActionResult> SavePaper([FromBody] Paper paper)
         {

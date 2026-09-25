@@ -115,6 +115,38 @@ class ApiService {
     }
   }
 
+  /// Lấy metadata chi tiết bài báo
+  Future<Map<String, dynamic>> getPaperMetadata(int id) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/paper/$id/metadata');
+    final response = await _client.get(url, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception(
+        'Lỗi lấy metadata bài báo (${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  /// Cập nhật thông tin/metadata bài báo
+  Future<Map<String, dynamic>> updatePaper(int id, Map<String, dynamic> data) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/paper/$id');
+    final response = await _client.put(
+      url,
+      headers: await _getHeaders(),
+      body: jsonEncode(data),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception(
+        'Lỗi cập nhật bài báo (${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
   /// Xóa bài báo theo ID
   Future<Map<String, dynamic>> deletePaper(int id) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/paper/$id');

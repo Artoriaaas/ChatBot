@@ -36,9 +36,9 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
 
   final _titleController = TextEditingController();
   final _authorsController = TextEditingController();
-  final _yearController = TextEditingController(text: '2024');
-  final _collectionController = TextEditingController(text: 'Deep Learning');
-  final _tagsController = TextEditingController(text: 'AI, LLM');
+  final _yearController = TextEditingController();
+  final _collectionController = TextEditingController();
+  final _tagsController = TextEditingController();
   final _abstractController = TextEditingController();
   String? _titleError;
 
@@ -103,9 +103,9 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                 ? cleanedTitle
                 : 'Tài liệu nghiên cứu mới';
             _authorsController.clear();
-            _yearController.text = DateTime.now().year.toString();
-            _collectionController.text = 'Tài liệu tải lên';
-            _tagsController.text = file.extension?.toUpperCase() ?? 'DOCUMENT';
+            _yearController.clear();
+            _collectionController.clear();
+            _tagsController.clear();
             _abstractController.clear();
             _titleError = null;
           });
@@ -161,12 +161,8 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
         .where((t) => t.isNotEmpty)
         .toList();
 
-    final year =
-        int.tryParse(_yearController.text.trim()) ?? DateTime.now().year;
-    final collection = _collectionController.text.trim().isNotEmpty
-        ? _collectionController.text.trim()
-        : 'General';
-
+    final year = int.tryParse(_yearController.text.trim()) ?? 0;
+    final collection = _collectionController.text.trim();
     final abstractText = _abstractController.text.trim();
 
     List<int>? bytes;
@@ -190,13 +186,11 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
     final newPaper = Paper(
       id: 'paper_${DateTime.now().millisecondsSinceEpoch}',
       title: title,
-      authors: authorsList.isNotEmpty ? authorsList : ['Research Author'],
+      authors: authorsList,
       year: year,
-      abstractText: abstractText.isNotEmpty
-          ? abstractText
-          : 'Đang chờ hệ thống trích xuất nội dung.',
+      abstractText: abstractText,
       collection: collection,
-      tags: tagsList.isNotEmpty ? tagsList : ['Research'],
+      tags: tagsList,
       pages: const [],
     );
 
@@ -298,14 +292,14 @@ class _ImportPaperDialogState extends State<ImportPaperDialog> {
                           color: colors.primary,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          _selectedFile != null
-                              ? 'Thông tin trích xuất từ file (Có thể chỉnh sửa)'
-                              : 'Thông tin bài báo',
-                          style: AppTypography.caption.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colors.textSecondary,
-                            fontSize: 12,
+                        Expanded(
+                          child: Text(
+                            'Thông tin bài báo (Các trường để trống sẽ tự động trích xuất bằng AI)',
+                            style: AppTypography.caption.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colors.textSecondary,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],

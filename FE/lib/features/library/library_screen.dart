@@ -55,15 +55,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
           await widget.viewModel.uploadPaper(
             bytes,
             fileName,
-            title: newPaper.title,
-            authors: newPaper.authors.join(', '),
-            year: newPaper.year,
-            collection: newPaper.collection,
-            tags: newPaper.tags.join(', '),
-            abstractText: newPaper.abstractText,
+            title: newPaper.title.isNotEmpty ? newPaper.title : null,
+            authors: newPaper.authors.isNotEmpty ? newPaper.authors.join(', ') : null,
+            year: newPaper.year > 0 ? newPaper.year : null,
+            collection: newPaper.collection.isNotEmpty ? newPaper.collection : null,
+            tags: newPaper.tags.isNotEmpty ? newPaper.tags.join(', ') : null,
+            abstractText: newPaper.abstractText.isNotEmpty ? newPaper.abstractText : null,
           );
           if (mounted) {
-            ScaffoldMessenger.of(this.context).showSnackBar(
+            ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Row(
                   children: [
@@ -303,6 +303,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                               ?.call(paper)
                                         : null,
                                     onDelete: () => _confirmDeletePaper(paper),
+                                    onMetadataUpdated: () => setState(() {}),
                                   );
                                 },
                               );
@@ -326,6 +327,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                                 ?.call(paper)
                                           : null,
                                       onDelete: () => _confirmDeletePaper(paper),
+                                      onMetadataUpdated: () => setState(() {}),
                                     ),
                                   );
                                 },

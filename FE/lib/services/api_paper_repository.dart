@@ -18,7 +18,7 @@ class ApiPaperRepository extends MockPaperRepository {
       for (final item in papersData) {
         final id = item['id']?.toString() ?? '0';
         final title = item['title'] as String? ?? 'Bài báo không tiêu đề';
-        final rawAuthors = item['authors'] as String? ?? 'Tác giả chưa rõ';
+        final rawAuthors = item['authors'] as String? ?? 'Chưa rõ tác giả';
         final authors = rawAuthors
             .split(',')
             .map((a) => a.trim())
@@ -36,17 +36,31 @@ class ApiPaperRepository extends MockPaperRepository {
             .toList();
         final isFavorite = item['isFavorite'] as bool? ?? false;
         final indexStatus = item['indexStatus'] as String? ?? 'Completed';
+        final journal = item['journal'] as String?;
+        final publisher = item['publisher'] as String?;
+        final doi = item['doi'] as String?;
+        final volume = item['volume'] as String?;
+        final issue = item['issue'] as String?;
+        final pagesInfo = item['pages'] as String?;
+        final keywords = item['keywords'] as String?;
 
         final paper = Paper(
           id: id,
           documentId: item['documentId']?.toString(),
           title: title,
-          authors: authors.isNotEmpty ? authors : ['Nghiên cứu viên'],
+          authors: authors.isNotEmpty ? authors : ['Chưa rõ tác giả'],
           year: year,
           abstractText: abstractText,
           tags: tags,
           collection: collection,
           isFavorite: isFavorite,
+          journal: journal,
+          publisher: publisher,
+          doi: doi,
+          volume: volume,
+          issue: issue,
+          pagesInfo: pagesInfo,
+          keywords: keywords,
           pages: [
             PaperPage(
               pageNumber: 1,
@@ -109,9 +123,9 @@ class ApiPaperRepository extends MockPaperRepository {
         id: paperId,
         documentId: documentId,
         title: title ?? fileName,
-        authors: authors != null
+        authors: (authors != null && authors.trim().isNotEmpty)
             ? authors.split(',').map((a) => a.trim()).toList()
-            : ['Tài liệu tải lên'],
+            : ['Chưa rõ tác giả'],
         year: year ?? DateTime.now().year,
         abstractText: abstractText ?? 'Đang xử lý...',
         tags: tags != null
@@ -144,28 +158,56 @@ class ApiPaperRepository extends MockPaperRepository {
     paper.indexProgress =
         (progress['progress'] as num?)?.toInt() ?? paper.indexProgress;
 
-    if (paper.indexStatus == 'Completed' && paper.pages.length <= 1) {
-      final chunks = await _apiService.getDocumentChunks(
-        int.parse(paper.documentId!),
-      );
-      if (chunks.isNotEmpty) {
-        paper.pages
-          ..clear()
-          ..addAll(
-            chunks.map(
-              (chunk) {
-                final rawTitle = chunk['sectionTitle'] as String?;
-                final title = (rawTitle != null && rawTitle.trim().isNotEmpty)
-                    ? rawTitle.trim()
-                    : 'Phần ${((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1}';
-                return PaperPage(
-                  pageNumber: ((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1,
-                  sectionTitle: title,
-                  content: chunk['content'] as String? ?? '',
-                );
-              },
-            ),
-          );
+    if (paper.indexStatus == 'Completed') {
+      try {
+        final meta = await _apiService.getPaperMetadata(int.parse(paper.id));
+        final rawTitle = meta['title'] as String?;
+        final rawAuthors = meta['authors'] as String?;
+        final authorsList = (rawAuthors != null && rawAuthors.isNotEmpty)
+            ? rawAuthors
+                .split(',')
+                .map((a) => a.trim())
+                .where((a) => a.isNotEmpty)
+                .toList()
+            : null;
+        paper.updateMetadata(
+          title: (rawTitle != null && rawTitle.isNotEmpty) ? rawTitle : null,
+          authors: authorsList,
+          year: meta['year'] as int?,
+          abstractText: meta['abstractText'] as String?,
+          journal: meta['journal'] as String?,
+          publisher: meta['publisher'] as String?,
+          doi: meta['doi'] as String?,
+          volume: meta['volume'] as String?,
+          issue: meta['issue'] as String?,
+          pagesInfo: meta['pages'] as String?,
+          keywords: meta['keywords'] as String?,
+        );
+      } catch (_) {}
+
+      if (paper.pages.length <= 1) {
+        final chunks = await _apiService.getDocumentChunks(
+          int.parse(paper.documentId!),
+        );
+        if (chunks.isNotEmpty) {
+          paper.pages
+            ..clear()
+            ..addAll(
+              chunks.map(
+                (chunk) {
+                  final rawTitle = chunk['sectionTitle'] as String?;
+                  final title = (rawTitle != null && rawTitle.trim().isNotEmpty)
+                      ? rawTitle.trim()
+                      : 'Phần ${((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1}';
+                  return PaperPage(
+                    pageNumber: ((chunk['chunkOrder'] as num?)?.toInt() ?? 0) + 1,
+                    sectionTitle: title,
+                    content: chunk['content'] as String? ?? '',
+                  );
+                },
+              ),
+            );
+        }
       }
     }
   }
@@ -196,5 +238,33 @@ class ApiPaperRepository extends MockPaperRepository {
       await _apiService.deletePaper(intId);
     }
     _remotePapers.removeWhere((p) => p.id == id);
+  }
+
+  @override
+  Future<void> updatePaper(Paper paper) async {
+    final intId = int.tryParse(paper.id);
+    if (intId != null) {
+      await _apiService.updatePaper(intId, {
+        'id': intId,
+        'title': paper.title,
+        'authors': paper.authors.join(', '),
+        'year': paper.year,
+        'abstractText': paper.abstractText,
+        'tags': paper.tags.join(', '),
+        'collection': paper.collection,
+        'isFavorite': paper.isFavorite,
+        'journal': paper.journal,
+        'publisher': paper.publisher,
+        'doi': paper.doi,
+        'volume': paper.volume,
+        'issue': paper.issue,
+        'pages': paper.pagesInfo,
+        'keywords': paper.keywords,
+      });
+    }
+    final index = _remotePapers.indexWhere((p) => p.id == paper.id);
+    if (index != -1) {
+      _remotePapers[index] = paper;
+    }
   }
 }

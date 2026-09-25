@@ -8,6 +8,7 @@ class PaperCard extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onToggleFavorite;
   final VoidCallback? onAddToProject;
+  final VoidCallback? onDelete;
 
   const PaperCard({
     super.key,
@@ -15,6 +16,7 @@ class PaperCard extends StatefulWidget {
     required this.onTap,
     required this.onToggleFavorite,
     this.onAddToProject,
+    this.onDelete,
   });
 
   @override
@@ -127,6 +129,21 @@ class _PaperCardState extends State<PaperCard> {
                         ? 'Remove from favorites'
                         : 'Add to favorites',
                   ),
+                  if (widget.onDelete != null) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        color: colors.textSecondary.withValues(alpha: 0.7),
+                        size: 20,
+                      ),
+                      hoverColor: Colors.red.withValues(alpha: 0.1),
+                      onPressed: widget.onDelete,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Xóa bài báo khỏi thư viện',
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 4),

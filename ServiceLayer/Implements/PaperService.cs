@@ -143,23 +143,41 @@ namespace ServiceLayer.Implements
             if (paper == null)
                 return (false, "Bài báo không tồn tại.");
 
-            if (paper.DocumentId.HasValue)
+            int? documentId = paper.DocumentId;
+            string? paperFilePath = paper.FilePath;
+
+            // 1. Xóa Paper trước để gỡ foreign key tham chiếu đến Document
+            await _paperRepository.DeleteAsync(paper);
+            await _paperRepository.SaveChangesAsync();
+
+            // 2. Cascade xóa Document, Chunks và file nếu có DocumentId
+            if (documentId.HasValue)
             {
-                var doc = await _documentRepository.GetByIdWithChunksAsync(paper.DocumentId.Value);
+                var doc = await _documentRepository.GetByIdWithChunksAsync(documentId.Value);
                 if (doc != null)
                 {
                     await _documentChunkRepository.DeleteByDocumentIdAsync(doc.Id);
                     await _documentChunkRepository.SaveChangesAsync();
-                    _fileUploadService.DeleteFile(doc.FilePath);
+
+                    if (!string.IsNullOrEmpty(doc.FilePath))
+                    {
+                        _fileUploadService.DeleteFile(doc.FilePath);
+                        _fileUploadService.DeleteFile(doc.FilePath + ".structure.json");
+                    }
+
                     await _documentRepository.DeleteAsync(doc);
                     await _documentRepository.SaveChangesAsync();
                 }
             }
 
-            await _paperRepository.DeleteAsync(paper);
-            await _paperRepository.SaveChangesAsync();
+            // 3. Xóa file vật lý của Paper nếu có đường dẫn riêng
+            if (!string.IsNullOrEmpty(paperFilePath))
+            {
+                _fileUploadService.DeleteFile(paperFilePath);
+                _fileUploadService.DeleteFile(paperFilePath + ".structure.json");
+            }
 
-            return (true, "Đã xóa bài báo thành công.");
+            return (true, "Đã xóa bài báo và toàn bộ dữ liệu liên quan thành công.");
         }
 
         public async Task<(bool Success, string Message)> SavePaperAsync(Paper paper)

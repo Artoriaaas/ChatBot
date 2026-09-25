@@ -24,7 +24,20 @@ namespace DataAccessLayer.Repositories.Implements
                 .Where(c => c.DocumentId == documentId)
                 .ToListAsync();
 
-            _context.DocumentChunks.RemoveRange(chunks);
+            if (chunks.Any())
+            {
+                var chunkIds = chunks.Select(c => c.Id).ToList();
+                var sources = await _context.ChatHistorySources
+                    .Where(s => chunkIds.Contains(s.DocumentChunkId))
+                    .ToListAsync();
+
+                if (sources.Any())
+                {
+                    _context.ChatHistorySources.RemoveRange(sources);
+                }
+
+                _context.DocumentChunks.RemoveRange(chunks);
+            }
         }
 
         public async Task<IEnumerable<DocumentChunk>> GetByDocumentIdAsync(int documentId)

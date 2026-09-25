@@ -17,6 +17,10 @@ class MockPaperRepository {
     _papers.insert(0, paper);
   }
 
+  Future<void> deletePaper(String id) async {
+    _papers.removeWhere((p) => p.id == id);
+  }
+
   static final List<Paper> _papers = [
     Paper(
       id: 'attention',

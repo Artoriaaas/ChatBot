@@ -122,6 +122,7 @@ namespace ServiceLayer.Implements
 
             await _documentChunkRepository.DeleteByDocumentIdAsync(id);
             _fileUploadService.DeleteFile(document.FilePath);
+            _fileUploadService.DeleteFile(document.FilePath + ".structure.json");
             await _documentRepository.DeleteAsync(document);
             await _documentRepository.SaveChangesAsync();
 

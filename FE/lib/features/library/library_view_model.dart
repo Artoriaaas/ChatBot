@@ -119,6 +119,17 @@ class LibraryViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> deletePaper(String paperId) async {
+    try {
+      await _repo.deletePaper(paperId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting paper: $e');
+      return false;
+    }
+  }
+
   Future<void> uploadPaper(
     List<int> bytes,
     String fileName, {

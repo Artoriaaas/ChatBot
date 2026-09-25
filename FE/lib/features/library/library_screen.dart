@@ -86,6 +86,98 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
+  Future<void> _confirmDeletePaper(Paper paper) async {
+    final colors = AppColorsExtension.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: colors.surfaceElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            const SizedBox(width: 10),
+            Text(
+              'Xóa bài báo',
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bạn có chắc chắn muốn xóa bài báo sau khỏi thư viện?',
+              style: TextStyle(color: colors.textPrimary, fontSize: 14),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.appBackground,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: colors.divider),
+              ),
+              child: Text(
+                paper.title,
+                style: TextStyle(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Lưu ý: Hệ thống sẽ cascade xóa vĩnh viễn toàn bộ dữ liệu phân tích, các đoạn chunking, vector embedding và file PDF lưu trên máy chủ.',
+              style: TextStyle(color: colors.textSecondary, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Hủy', style: TextStyle(color: colors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Xóa vĩnh viễn'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final success = await widget.viewModel.deletePaper(paper.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'Đã xóa bài báo thành công.'
+                  : 'Xóa bài báo thất bại. Vui lòng thử lại.',
+            ),
+            backgroundColor: success ? Colors.green : Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppColorsExtension.of(context);
@@ -205,6 +297,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                         ? () => widget.onAddPaperToProject
                                               ?.call(paper)
                                         : null,
+                                    onDelete: () => _confirmDeletePaper(paper),
                                   );
                                 },
                               );
@@ -227,6 +320,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                           ? () => widget.onAddPaperToProject
                                                 ?.call(paper)
                                           : null,
+                                      onDelete: () => _confirmDeletePaper(paper),
                                     ),
                                   );
                                 },

@@ -188,4 +188,13 @@ class ApiPaperRepository extends MockPaperRepository {
   void addPaper(Paper paper) {
     _remotePapers.insert(0, paper);
   }
+
+  @override
+  Future<void> deletePaper(String id) async {
+    final intId = int.tryParse(id);
+    if (intId != null) {
+      await _apiService.deletePaper(intId);
+    }
+    _remotePapers.removeWhere((p) => p.id == id);
+  }
 }

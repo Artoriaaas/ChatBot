@@ -14,6 +14,7 @@ class LibraryScreen extends StatefulWidget {
   final LibraryViewModel viewModel;
   final ValueChanged<Paper> onPaperSelected;
   final ValueChanged<Paper>? onAddPaperToProject;
+  final ValueChanged<Paper>? onPaperDeleted;
 
   const LibraryScreen({
     super.key,
@@ -21,6 +22,7 @@ class LibraryScreen extends StatefulWidget {
     required this.viewModel,
     required this.onPaperSelected,
     this.onAddPaperToProject,
+    this.onPaperDeleted,
   });
 
   @override
@@ -163,6 +165,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
     if (confirmed == true && mounted) {
       final success = await widget.viewModel.deletePaper(paper.id);
+      if (success) {
+        widget.onPaperDeleted?.call(paper);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

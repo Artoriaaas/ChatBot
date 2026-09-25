@@ -283,11 +283,26 @@ class _AppShellState extends State<AppShell> {
     return ListenableBuilder(
       listenable: Listenable.merge([
         widget.settingsVM,
+        widget.libraryVM,
         ?projectsVM,
       ]),
       builder: (context, _) {
         final colors = AppColorsExtension.of(context);
         final activeProject = projectsVM?.activeProject;
+
+        // Tự động đồng bộ và loại bỏ các paper đã bị xóa khỏi danh sách đang mở
+        final libraryPaperIds = widget.libraryVM.papers.map((p) => p.id).toSet();
+        _openPapers.removeWhere((p) => !libraryPaperIds.contains(p.id));
+        if (_selectedPaper != null && !libraryPaperIds.contains(_selectedPaper!.id)) {
+          if (_openPapers.isNotEmpty) {
+            _selectedPaper = _openPapers.last;
+            widget.readerVM.openPaper(_selectedPaper!);
+            widget.chatVM.setCurrentPaper(_selectedPaper!);
+          } else {
+            _selectedPaper = null;
+            widget.chatVM.stopStreaming();
+          }
+        }
 
         // Build main content area based on navigation or active paper/project
         Widget mainBody;
@@ -324,6 +339,7 @@ class _AppShellState extends State<AppShell> {
                 settingsVM: widget.settingsVM,
                 viewModel: widget.libraryVM,
                 onPaperSelected: (paper) => _openPaper(paper),
+                onPaperDeleted: (paper) => _closeTab(paper),
                 onAddPaperToProject: (paper) => _showSelectProjectDialogForPaper(paper),
               );
               break;
@@ -348,6 +364,7 @@ class _AppShellState extends State<AppShell> {
                 settingsVM: widget.settingsVM,
                 viewModel: widget.libraryVM,
                 onPaperSelected: (paper) => _openPaper(paper),
+                onPaperDeleted: (paper) => _closeTab(paper),
                 onAddPaperToProject: (paper) => _showSelectProjectDialogForPaper(paper),
               );
           }
@@ -375,6 +392,7 @@ class _AppShellState extends State<AppShell> {
                   onEditProject: _showEditProjectDialog,
                   onNewProjectChat: _onOpenProjectChat,
                   onCreateProject: _showCreateProjectDialog,
+                  onClosePaper: _closeTab,
                   onToggleCollapse: () => setState(() => _isSidebarCollapsed = true),
                   onSearch: (query) {
                     widget.libraryVM.searchQuery = query;

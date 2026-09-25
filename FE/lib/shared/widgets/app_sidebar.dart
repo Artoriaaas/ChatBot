@@ -24,6 +24,7 @@ class AppSidebar extends StatefulWidget {
   final VoidCallback? onCreateProject;
   final VoidCallback? onToggleCollapse;
   final ValueChanged<String>? onSearch;
+  final ValueChanged<Paper>? onClosePaper;
 
   const AppSidebar({
     super.key,
@@ -43,6 +44,7 @@ class AppSidebar extends StatefulWidget {
     this.onCreateProject,
     this.onToggleCollapse,
     this.onSearch,
+    this.onClosePaper,
   });
 
   @override
@@ -304,6 +306,9 @@ class _AppSidebarState extends State<AppSidebar> {
                           label: paper.title,
                           isSelected: isPaperActive,
                           onTap: () => widget.onSelectPaper(paper),
+                          onClose: widget.onClosePaper != null
+                              ? () => widget.onClosePaper!(paper)
+                              : null,
                         );
                       }),
                     ],
@@ -713,6 +718,7 @@ class _SidebarNavItem extends StatefulWidget {
   final bool isSelected;
   final bool isSubItem;
   final VoidCallback onTap;
+  final VoidCallback? onClose;
 
   const _SidebarNavItem({
     required this.icon,
@@ -720,6 +726,7 @@ class _SidebarNavItem extends StatefulWidget {
     required this.isSelected,
     this.isSubItem = false,
     required this.onTap,
+    this.onClose,
   });
 
   @override
@@ -770,6 +777,24 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                   ),
                 ),
               ),
+              if (widget.onClose != null && _isHovered) ...[
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: 'Đóng',
+                  child: InkWell(
+                    onTap: widget.onClose,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2.0),
+                      child: Icon(
+                        Icons.close,
+                        size: 14,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

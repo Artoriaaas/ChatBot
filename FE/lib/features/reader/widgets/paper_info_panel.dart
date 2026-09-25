@@ -5,6 +5,8 @@ import 'package:paper_chat/app/theme/app_typography.dart';
 import 'package:paper_chat/features/reader/widgets/edit_paper_metadata_dialog.dart';
 import 'package:paper_chat/features/settings/settings_view_model.dart';
 import 'package:paper_chat/models/paper.dart';
+import 'package:paper_chat/services/api_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PaperInfoPanel extends StatefulWidget {
   final SettingsViewModel settingsVM;
@@ -311,7 +313,27 @@ class _PaperInfoPanelState extends State<PaperInfoPanel> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+
+                    // View Original File button
+                    FilledButton.icon(
+                      onPressed: () async {
+                        final paperId = int.tryParse(paper.id);
+                        if (paperId == null) return;
+                        final url = ApiService().getPaperFileUrl(paperId);
+                        final uri = Uri.parse(url);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      },
+                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 14),
+                      label: Text(strings.viewOriginalFile),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
 
                     // Edit button
                     OutlinedButton.icon(

@@ -4,6 +4,7 @@ import 'package:paper_chat/features/chat/chat_panel.dart';
 import 'package:paper_chat/features/chat/chat_view_model.dart';
 import 'package:paper_chat/features/notes/widgets/minimizable_note_editor.dart';
 import 'package:paper_chat/features/reader/reader_view_model.dart';
+import 'package:paper_chat/features/reader/widgets/original_pdf_viewer.dart';
 import 'package:paper_chat/features/reader/widgets/paper_info_panel.dart';
 import 'package:paper_chat/features/reader/widgets/reader_pane.dart';
 import 'package:paper_chat/features/reader/widgets/reader_toolbar.dart';
@@ -48,6 +49,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   double _chatWidth = 400;
   bool _isTocOpen = false;
   bool _isInfoOpen = false;
+  ReaderViewMode _viewMode = ReaderViewMode.ai;
   bool _isHighlightMode = false;
   int _activeNarrowTab = 0; // 0=reader, 1=chat (for narrow mode)
   bool _isEditingNote = false;
@@ -163,6 +165,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       if (_isInfoOpen) _isTocOpen = false;
                     }),
                     isInfoOpen: _isInfoOpen,
+                    viewMode: _viewMode,
+                    onViewModeChanged: (mode) => setState(() => _viewMode = mode),
                     currentPage: widget.readerViewModel.currentPage,
                     totalPages: widget.readerViewModel.totalPages,
                     onGoToPage: widget.readerViewModel.goToPage,
@@ -235,46 +239,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         ),
                       ],
 
-                      // Main PDF Reader Pane
+                      // Main Reader Content Area (AI, Original PDF, or Split View)
                       if (!isNarrow || _activeNarrowTab == 0)
                         Expanded(
-                          child: ListenableBuilder(
-                            listenable: Listenable.merge([widget.readerViewModel, widget.settingsViewModel]),
-                            builder: (context, _) {
-                              final pageContent = widget.readerViewModel.currentPageContent;
-                              if (widget.paper.pages.isEmpty) return const Center(child: CircularProgressIndicator());
-                              return ReaderPane(
-                                strings: widget.settingsViewModel.strings,
-                                paper: widget.paper,
-                                pageContent: pageContent,
-                                currentPage: widget.readerViewModel.currentPage,
-                                isContinuousMode: widget.readerViewModel.isContinuousMode,
-                                onPageChanged: widget.readerViewModel.goToPage,
-                                zoomLevel: widget.readerViewModel.zoomLevel,
-                                searchQuery: widget.readerViewModel.searchQuery,
-                                highlights: widget.readerViewModel.currentHighlights,
-                                highlightedCitationText: widget.readerViewModel.highlightedCitationText,
-                                onTextSelected: (text) {
-                                  widget.readerViewModel.selectText(text);
-                                  if (_isHighlightMode) {
-                                    widget.readerViewModel.addHighlight(text);
-                                  }
-                                },
-                                onClearSelection: widget.readerViewModel.clearSelection,
-                                onExplain: _handleExplain,
-                                onSummarize: _handleSummarize,
-                                onAskAi: _handleAskAi,
-                                onAddNote: _handleCreateNoteFromSelection,
-                                onToggleHighlight: (text) {
-                                  if (widget.readerViewModel.currentHighlights.contains(text)) {
-                                    widget.readerViewModel.removeHighlight(text);
-                                  } else {
-                                    widget.readerViewModel.addHighlight(text);
-                                  }
-                                },
-                              );
-                            },
-                          ),
+                          child: _buildMainContentArea(),
                         ),
 
                       // Resizable Right Panel (Chat & Notes)
@@ -349,6 +317,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           });
         },
         onSave: (title, content) async {
+          final messenger = ScaffoldMessenger.of(context);
           if (_editingNoteTarget != null) {
             final updated = Note(
               id: _editingNoteTarget!.id,
@@ -378,7 +347,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
             _isEditingNote = false;
           });
           if (mounted) {
-            ScaffoldMessenger.of(this.context).showSnackBar(
+            messenger.showSnackBar(
               SnackBar(
                 content: Text(widget.settingsViewModel.strings.savedToNotes),
                 duration: const Duration(seconds: 2),
@@ -389,5 +358,74 @@ class _ReaderScreenState extends State<ReaderScreen> {
       ),
   ],
 );
+  }
+
+  Widget _buildMainContentArea() {
+    switch (_viewMode) {
+      case ReaderViewMode.ai:
+        return _buildAiReaderPane();
+      case ReaderViewMode.original:
+        return OriginalPdfViewer(
+          paper: widget.paper,
+          strings: widget.settingsViewModel.strings,
+        );
+      case ReaderViewMode.split:
+        return Row(
+          children: [
+            Expanded(
+              flex: 1,
+              child: OriginalPdfViewer(
+                paper: widget.paper,
+                strings: widget.settingsViewModel.strings,
+              ),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(
+              flex: 1,
+              child: _buildAiReaderPane(),
+            ),
+          ],
+        );
+    }
+  }
+
+  Widget _buildAiReaderPane() {
+    return ListenableBuilder(
+      listenable: Listenable.merge([widget.readerViewModel, widget.settingsViewModel]),
+      builder: (context, _) {
+        final pageContent = widget.readerViewModel.currentPageContent;
+        if (widget.paper.pages.isEmpty) return const Center(child: CircularProgressIndicator());
+        return ReaderPane(
+          strings: widget.settingsViewModel.strings,
+          paper: widget.paper,
+          pageContent: pageContent,
+          currentPage: widget.readerViewModel.currentPage,
+          isContinuousMode: widget.readerViewModel.isContinuousMode,
+          onPageChanged: widget.readerViewModel.goToPage,
+          zoomLevel: widget.readerViewModel.zoomLevel,
+          searchQuery: widget.readerViewModel.searchQuery,
+          highlights: widget.readerViewModel.currentHighlights,
+          highlightedCitationText: widget.readerViewModel.highlightedCitationText,
+          onTextSelected: (text) {
+            widget.readerViewModel.selectText(text);
+            if (_isHighlightMode) {
+              widget.readerViewModel.addHighlight(text);
+            }
+          },
+          onClearSelection: widget.readerViewModel.clearSelection,
+          onExplain: _handleExplain,
+          onSummarize: _handleSummarize,
+          onAskAi: _handleAskAi,
+          onAddNote: _handleCreateNoteFromSelection,
+          onToggleHighlight: (text) {
+            if (widget.readerViewModel.currentHighlights.contains(text)) {
+              widget.readerViewModel.removeHighlight(text);
+            } else {
+              widget.readerViewModel.addHighlight(text);
+            }
+          },
+        );
+      },
+    );
   }
 }

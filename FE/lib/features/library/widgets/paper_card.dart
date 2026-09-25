@@ -3,6 +3,8 @@ import 'package:paper_chat/app/theme/app_colors.dart';
 import 'package:paper_chat/app/theme/motion.dart';
 import 'package:paper_chat/features/reader/widgets/edit_paper_metadata_dialog.dart';
 import 'package:paper_chat/models/paper.dart';
+import 'package:paper_chat/services/api_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PaperCard extends StatefulWidget {
   final Paper paper;
@@ -116,6 +118,26 @@ class _PaperCardState extends State<PaperCard> {
                         ),
                       ),
                     ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.picture_as_pdf_outlined,
+                      color: colors.primary.withValues(alpha: 0.85),
+                      size: 19,
+                    ),
+                    onPressed: () async {
+                      final paperId = int.tryParse(widget.paper.id);
+                      if (paperId == null) return;
+                      final url = ApiService().getPaperFileUrl(paperId);
+                      final uri = Uri.parse(url);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri);
+                      }
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Xem / Tải file gốc',
+                  ),
+                  const SizedBox(width: 4),
                   IconButton(
                     icon: Icon(
                       Icons.info_outline,

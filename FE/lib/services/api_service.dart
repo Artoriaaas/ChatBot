@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:paper_chat/services/api_config.dart';
@@ -296,6 +297,24 @@ class ApiService {
     } else {
       throw Exception(
         'Lỗi lấy lịch sử chat (${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  /// Lấy URL trực tiếp tới file gốc của Paper (phục vụ view inline hoặc download)
+  String getPaperFileUrl(int paperId, {bool download = false}) {
+    return '${ApiConfig.baseUrl}/paper/$paperId/file${download ? '?download=true' : ''}';
+  }
+
+  /// Tải toàn bộ bytes của file gốc từ Backend
+  Future<Uint8List> downloadPaperFileBytes(int paperId) async {
+    final url = Uri.parse(getPaperFileUrl(paperId));
+    final response = await _client.get(url, headers: await _getHeaders());
+    if (response.statusCode == 200) {
+      return response.bodyBytes;
+    } else {
+      throw Exception(
+        'Lỗi tải file gốc (${response.statusCode}): ${response.body}',
       );
     }
   }

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ServiceLayer.Interfaces;
 using System;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace ChatBot.Controllers
@@ -118,6 +120,60 @@ namespace ChatBot.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("{id}/file")]
+        public async Task<IActionResult> GetPaperFile(int id, [FromQuery] bool download = false)
+        {
+            try
+            {
+                var paper = await _paperService.GetByIdAsync(id);
+                if (paper == null)
+                    return NotFound(new { message = "Không tìm thấy bài báo." });
+
+                var filePath = paper.FilePath;
+                if (string.IsNullOrWhiteSpace(filePath) || !System.IO.File.Exists(filePath))
+                {
+                    if (paper.Document != null && !string.IsNullOrWhiteSpace(paper.Document.FilePath) && System.IO.File.Exists(paper.Document.FilePath))
+                    {
+                        filePath = paper.Document.FilePath;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(filePath) || !System.IO.File.Exists(filePath))
+                {
+                    return NotFound(new { message = "File tài liệu gốc không tồn tại trên hệ thống lưu trữ." });
+                }
+
+                var ext = Path.GetExtension(filePath).ToLowerInvariant();
+                var contentType = ext switch
+                {
+                    ".pdf" => "application/pdf",
+                    ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ".doc" => "application/msword",
+                    ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    ".ppt" => "application/vnd.ms-powerpoint",
+                    _ => "application/octet-stream"
+                };
+
+                var rawTitle = string.IsNullOrWhiteSpace(paper.Title)
+                    ? Path.GetFileNameWithoutExtension(filePath)
+                    : paper.Title.Trim();
+                var safeTitle = string.Concat(rawTitle.Split(Path.GetInvalidFileNameChars()));
+                var fileName = $"{safeTitle}{ext}";
+
+                if (download)
+                {
+                    return PhysicalFile(filePath, contentType, fileName, enableRangeProcessing: true);
+                }
+
+                Response.Headers.Append("Content-Disposition", $"inline; filename=\"{fileName}\"");
+                return PhysicalFile(filePath, contentType, enableRangeProcessing: true);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = $"Lỗi khi tải file: {ex.Message}" });
             }
         }
 

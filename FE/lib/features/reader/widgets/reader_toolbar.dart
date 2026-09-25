@@ -3,12 +3,20 @@ import 'package:paper_chat/app/theme/app_colors.dart';
 import 'package:paper_chat/app/theme/app_typography.dart';
 import 'package:paper_chat/features/settings/settings_view_model.dart';
 
+enum ReaderViewMode {
+  ai,
+  original,
+  split,
+}
+
 class ReaderToolbar extends StatelessWidget {
   final SettingsViewModel settingsVM;
   final VoidCallback onToggleToc;
   final bool isTocOpen;
   final VoidCallback? onToggleInfo;
   final bool isInfoOpen;
+  final ReaderViewMode viewMode;
+  final ValueChanged<ReaderViewMode>? onViewModeChanged;
   final int currentPage;
   final int totalPages;
   final ValueChanged<int> onGoToPage;
@@ -36,6 +44,8 @@ class ReaderToolbar extends StatelessWidget {
     required this.isTocOpen,
     this.onToggleInfo,
     this.isInfoOpen = false,
+    this.viewMode = ReaderViewMode.ai,
+    this.onViewModeChanged,
     required this.currentPage,
     required this.totalPages,
     required this.onGoToPage,
@@ -135,6 +145,46 @@ class ReaderToolbar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
+
+              // View Mode Selector (AI vs Original PDF vs Split View)
+              Container(
+                height: 28,
+                decoration: BoxDecoration(
+                  color: colors.appBackground,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: colors.divider),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildViewModeButton(
+                      mode: ReaderViewMode.ai,
+                      currentMode: viewMode,
+                      icon: Icons.article_outlined,
+                      label: strings.aiContent,
+                      onTap: () => onViewModeChanged?.call(ReaderViewMode.ai),
+                      colors: colors,
+                    ),
+                    _buildViewModeButton(
+                      mode: ReaderViewMode.original,
+                      currentMode: viewMode,
+                      icon: Icons.picture_as_pdf_outlined,
+                      label: strings.originalFile,
+                      onTap: () => onViewModeChanged?.call(ReaderViewMode.original),
+                      colors: colors,
+                    ),
+                    _buildViewModeButton(
+                      mode: ReaderViewMode.split,
+                      currentMode: viewMode,
+                      icon: Icons.vertical_split_outlined,
+                      label: strings.splitView,
+                      onTap: () => onViewModeChanged?.call(ReaderViewMode.split),
+                      colors: colors,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
 
               // Search in PDF input box
               SizedBox(
@@ -346,9 +396,50 @@ class ReaderToolbar extends StatelessWidget {
               ),
             ],
           ),
-          ),
-        );
-      },
+        ),
+      );
+    },
+  );
+}
+
+  Widget _buildViewModeButton({
+    required ReaderViewMode mode,
+    required ReaderViewMode currentMode,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required AppColorsExtension colors,
+  }) {
+    final isSelected = mode == currentMode;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(5),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? colors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.white : colors.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: AppTypography.caption.copyWith(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? Colors.white : colors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

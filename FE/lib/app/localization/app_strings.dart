@@ -80,6 +80,16 @@ class AppStrings {
   String pageIndicator(int current, int total) => isVi ? 'Trang $current/$total' : 'Page $current/$total';
   String searchMatchIndicator(int current, int total) => isVi ? '$current/$total' : '$current/$total';
 
+  // Original File & View Modes
+  String get originalFile => isVi ? 'File gốc' : 'Original File';
+  String get aiContent => isVi ? 'Trích xuất AI' : 'AI Content';
+  String get splitView => isVi ? 'Song song' : 'Split View';
+  String get viewOriginalFile => isVi ? 'Xem file gốc' : 'View Original File';
+  String get downloadOriginalFile => isVi ? 'Tải file gốc' : 'Download Original File';
+  String get openInExternalApp => isVi ? 'Mở bằng ứng dụng ngoài' : 'Open in External App';
+  String get loadingOriginalPdf => isVi ? 'Đang tải file gốc...' : 'Loading original file...';
+  String get cannotPreviewNonPdf => isVi ? 'Định dạng tài liệu không hỗ trợ xem trực tiếp. Vui lòng tải về hoặc mở bằng ứng dụng ngoài.' : 'Document format cannot be previewed directly. Please download or open externally.';
+
   // Text Selection Popup
   String get askAi => isVi ? 'Hỏi AI' : 'Ask AI';
   String get explain => isVi ? 'Giải thích' : 'Explain';

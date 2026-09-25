@@ -187,8 +187,26 @@ class _ReaderPaneState extends State<ReaderPane> {
         color: colors.textSecondary,
       ),
       blockquoteDecoration: BoxDecoration(
-        border: Border(left: BorderSide(color: colors.primary, width: 3)),
+        color: colors.primary.withValues(alpha: 0.04),
+        border: Border(left: BorderSide(color: colors.primary, width: 3.5)),
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(4),
+          bottomRight: Radius.circular(4),
+        ),
       ),
+      tableHead: AppTypography.caption.copyWith(
+        fontWeight: FontWeight.bold,
+        color: colors.textPrimary,
+      ),
+      tableBody: AppTypography.body.copyWith(
+        fontSize: baseFontSize * 0.95,
+        color: colors.textPrimary,
+      ),
+      tableBorder: TableBorder.all(
+        color: colors.divider,
+        width: 1,
+      ),
+      tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     );
   }
 
@@ -206,8 +224,14 @@ class _ReaderPaneState extends State<ReaderPane> {
       data: textContent,
       selectable: false,
       extensionSet: md.ExtensionSet.gitHubFlavored,
-      inlineSyntaxes: [MathSyntax()],
-      builders: {'math': MathBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary))},
+      inlineSyntaxes: [
+        BlockMathSyntax(),
+        MathSyntax(),
+      ],
+      builders: {
+        'math': MathBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary)),
+        'math-block': MathBlockBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary)),
+      },
       styleSheet: styleSheet,
     );
 

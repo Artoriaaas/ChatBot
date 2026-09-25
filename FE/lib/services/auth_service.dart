@@ -8,8 +8,8 @@ class AuthService {
 
   AuthService({http.Client? client}) : _client = client ?? http.Client();
 
-  /// Đăng nhập bằng Email và Password
-  Future<bool> login(String email, String password) async {
+  /// Đăng nhập bằng Email và Password, trực tiếp nhận và lưu token
+  Future<String?> login(String email, String password) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/Auth/login');
     final response = await _client.post(
       url,
@@ -21,9 +21,25 @@ class AuthService {
     );
 
     if (response.statusCode == 200) {
-      return true;
+      final data = jsonDecode(response.body);
+      final token = data['token'] as String?;
+      if (token != null && token.isNotEmpty) {
+        await saveToken(token);
+      }
+      return token;
     } else {
-      throw Exception('Lỗi đăng nhập: ${response.body}');
+      String errorMsg = 'Email hoặc mật khẩu không đúng.';
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['message'] != null) {
+          errorMsg = decoded['message'];
+        } else if (response.body.isNotEmpty) {
+          errorMsg = response.body;
+        }
+      } catch (_) {
+        if (response.body.isNotEmpty) errorMsg = response.body;
+      }
+      throw Exception(errorMsg);
     }
   }
 

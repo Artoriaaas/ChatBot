@@ -29,10 +29,7 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // ĐĂNG NHẬP – Bước 1: gửi email + password lên backend
-  // Backend kiểm tra tài khoản + mật khẩu BCrypt, nếu đúng → gửi OTP
-  // Trả về true = OTP đã gửi (UI cần hiện dialog nhập OTP)
-  // Trả về false = sai email/mật khẩu hoặc lỗi mạng
+  // ĐĂNG NHẬP: gửi email + password lên backend, nhận JWT trực tiếp (không cần OTP)
   // ─────────────────────────────────────────────────────────────
   Future<bool> loginWithEmail(String email, String password) async {
     _isLoading = true;
@@ -57,13 +54,28 @@ class AuthViewModel extends ChangeNotifier {
     }
 
     try {
-      // Gọi API: backend verify password BCrypt, nếu đúng mới gửi OTP
-      final otpSent = await _authService.login(trimmedEmail, trimmedPass);
+      final token = await _authService.login(trimmedEmail, trimmedPass);
+      if (token != null && token.isNotEmpty) {
+        final namePart = trimmedEmail.split('@').first;
+        final displayName = namePart[0].toUpperCase() + namePart.substring(1);
+        _currentUser = UserProfile(
+          id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
+          name: displayName,
+          email: trimmedEmail,
+          avatarUrl:
+              'https://ui-avatars.com/api/?name=${Uri.encodeComponent(displayName)}&background=6366f1&color=fff&bold=true',
+          isGoogleAuth: false,
+        );
+        _isLoggedIn = true;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+      _errorMessage = 'Không nhận được token xác thực từ máy chủ.';
       _isLoading = false;
       notifyListeners();
-      return otpSent;
+      return false;
     } catch (e) {
-      // Backend trả 401 = sai email/mật khẩu → throw Exception
       _errorMessage = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();

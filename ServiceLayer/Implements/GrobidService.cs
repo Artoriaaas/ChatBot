@@ -185,6 +185,7 @@ namespace ServiceLayer.Implements
                 result.AbstractText = abstractBuilder.ToString().Trim();
 
                 // 5. Trích xuất các Mục (Sections)
+                // 5. Trích xuất các Mục (Sections) với Gom nhóm phân cấp (Hierarchical Grouping - Cách 1)
                 var sections = new List<DocumentSectionDto>();
                 int sectionOrder = 0;
 
@@ -203,59 +204,215 @@ namespace ServiceLayer.Implements
                 var bodyNode = doc.Descendants(ns + "body").FirstOrDefault();
                 if (bodyNode != null)
                 {
-                    var divs = bodyNode.Elements(ns + "div").ToList();
-                    // Nếu body không chia thành div cấp 1, tìm tất cả div con
-                    if (!divs.Any())
+                    var rawDivs = new List<RawDivInfo>();
+                    var topDivs = bodyNode.Elements(ns + "div").ToList();
+                    if (!topDivs.Any())
                     {
-                        divs = bodyNode.Descendants(ns + "div").ToList();
+                        topDivs = bodyNode.Descendants(ns + "div").ToList();
                     }
 
-                    foreach (var div in divs)
+                    foreach (var div in topDivs)
                     {
-                        var head = div.Element(ns + "head")?.Value;
-                        var sectionTitle = !string.IsNullOrWhiteSpace(head) ? CleanWhitespace(head) : $"Mục {sectionOrder + 1}";
+                        var headNode = div.Element(ns + "head");
+                        var nAttr = (string?)headNode?.Attribute("n");
+                        var headText = headNode != null ? CleanWhitespace(headNode.Value) : string.Empty;
+                        var fullTitle = BuildFullSectionTitle(nAttr, headText);
+                        var (isMajor, majorPrefix) = DetermineSectionHierarchy(nAttr, fullTitle);
+                        var content = ExtractDivContent(div, ns);
 
-                        var pBuilder = new StringBuilder();
-                        foreach (var p in div.Elements(ns + "p"))
+                        rawDivs.Add(new RawDivInfo
                         {
-                            var pText = ExtractFormattedText(p);
-                            if (!string.IsNullOrWhiteSpace(pText))
-                            {
-                                pBuilder.AppendLine(pText);
-                                pBuilder.AppendLine();
-                            }
-                        }
+                            RawHead = headText,
+                            NAttr = nAttr,
+                            FullTitle = fullTitle,
+                            IsMajorSection = isMajor,
+                            MajorPrefix = majorPrefix,
+                            Content = content
+                        });
 
-                        // Kiểm tra nếu có div con lồng vào
+                        // Xử lý các div con lồng vào (nếu có)
                         foreach (var subDiv in div.Elements(ns + "div"))
                         {
-                            var subHead = subDiv.Element(ns + "head")?.Value;
-                            if (!string.IsNullOrWhiteSpace(subHead))
+                            var subHead = subDiv.Element(ns + "head");
+                            var subN = (string?)subHead?.Attribute("n");
+                            var subText = subHead != null ? CleanWhitespace(subHead.Value) : string.Empty;
+                            var subFullTitle = BuildFullSectionTitle(subN, subText);
+                            var (subIsMajor, subMajorPrefix) = DetermineSectionHierarchy(subN, subFullTitle);
+                            if (string.IsNullOrEmpty(subMajorPrefix))
                             {
-                                pBuilder.AppendLine($"### {CleanWhitespace(subHead)}");
-                                pBuilder.AppendLine();
+                                subMajorPrefix = majorPrefix;
                             }
-                            foreach (var subP in subDiv.Elements(ns + "p"))
-                            {
-                                var subPText = ExtractFormattedText(subP);
-                                if (!string.IsNullOrWhiteSpace(subPText))
-                                {
-                                    pBuilder.AppendLine(subPText);
-                                    pBuilder.AppendLine();
-                                }
-                            }
-                        }
+                            var subContent = ExtractDivContent(subDiv, ns);
 
-                        var content = pBuilder.ToString().Trim();
-                        if (!string.IsNullOrWhiteSpace(content))
-                        {
-                            sections.Add(new DocumentSectionDto
+                            rawDivs.Add(new RawDivInfo
                             {
-                                SectionOrder = sectionOrder++,
-                                Title = sectionTitle,
-                                Content = content
+                                RawHead = subText,
+                                NAttr = subN,
+                                FullTitle = subFullTitle,
+                                IsMajorSection = false,
+                                MajorPrefix = subMajorPrefix,
+                                Content = subContent
                             });
                         }
+                    }
+
+                    // 5.1 Xử lý các đối tượng figure và table nằm trực tiếp dưới body
+                    var figuresMap = new Dictionary<string, (string id, string markdown, bool used)>();
+
+                    foreach (var fig in bodyNode.Elements(ns + "figure"))
+                    {
+                        var id = (string?)fig.Attribute(XNamespace.Xml + "id") ?? (string?)fig.Attribute("id") ?? string.Empty;
+                        var isTable = (string?)fig.Attribute("type") == "table" || fig.Element(ns + "table") != null;
+                        var descNode = fig.Element(ns + "figDesc");
+                        var rawDesc = descNode != null ? CleanWhitespace(descNode.Value) : string.Empty;
+
+                        // Kiểm tra nếu figure này thực chất chứa một tiểu mục bị GROBID gộp nhầm (ví dụ: 3.2 Feature Selection)
+                        var secMatch = Regex.Match(rawDesc, @"(?<pre>.*?)(?<secnum>\b\d+\.\d+)\.?\s+(?<sectitle>(?:[A-Z][a-z]+\s*){1,4})(?<post>[A-Z][a-z].*)", RegexOptions.Singleline);
+                        if (secMatch.Success && !isTable)
+                        {
+                            var pre = secMatch.Groups["pre"].Value.Trim();
+                            var secNum = secMatch.Groups["secnum"].Value.Trim();
+                            var secTitle = secMatch.Groups["sectitle"].Value.Trim();
+                            var post = secMatch.Groups["post"].Value.Trim();
+
+                            // Bổ sung phần dẫn nhập và sơ đồ (pre) vào tiểu mục trước đó (ví dụ 3.1)
+                            var parentPrefix = secNum.Split('.')[0];
+                            var prevDiv = rawDivs.LastOrDefault(d => !d.IsMajorSection && d.MajorPrefix == parentPrefix);
+                            if (prevDiv != null && !string.IsNullOrWhiteSpace(pre))
+                            {
+                                prevDiv.Content = (prevDiv.Content + "\n\n" + pre).Trim();
+                            }
+
+                            // Định dạng nội dung tiểu mục được khôi phục (post)
+                            var formattedPost = FormatEmbeddedSubsectionText(post);
+                            var fullSubTitle = $"{secNum} {secTitle}".Trim();
+                            var (isMaj, majPref) = DetermineSectionHierarchy(secNum, fullSubTitle);
+
+                            int insertIdx = prevDiv != null ? rawDivs.IndexOf(prevDiv) + 1 : rawDivs.Count;
+                            rawDivs.Insert(insertIdx, new RawDivInfo
+                            {
+                                RawHead = secTitle,
+                                NAttr = secNum,
+                                FullTitle = fullSubTitle,
+                                IsMajorSection = isMaj,
+                                MajorPrefix = majPref,
+                                Content = formattedPost
+                            });
+                        }
+                        else
+                        {
+                            var md = FormatTeiFigure(fig, ns);
+                            if (!string.IsNullOrWhiteSpace(md))
+                            {
+                                if (!string.IsNullOrEmpty(id)) figuresMap[id] = (id, md, false);
+                                var head = fig.Element(ns + "head")?.Value;
+                                if (!string.IsNullOrEmpty(head)) figuresMap[CleanWhitespace(head)] = (id, md, false);
+                            }
+                        }
+                    }
+
+                    // 5.2 Gắn bảng (table) và hình (figure) vào đúng section tương ứng (tránh trùng lặp)
+                    var usedFigureIds = new HashSet<string>();
+                    foreach (var div in rawDivs)
+                    {
+                        foreach (var kvp in figuresMap.ToList())
+                        {
+                            if (usedFigureIds.Contains(kvp.Value.id)) continue;
+                            bool isReferenced = (!string.IsNullOrEmpty(kvp.Key) && div.Content.Contains(kvp.Key)) ||
+                                                (kvp.Key.StartsWith("Table", StringComparison.OrdinalIgnoreCase) && (div.Content.Contains("Table 1") || div.Content.Contains("table 1"))) ||
+                                                (kvp.Key.StartsWith("Figure", StringComparison.OrdinalIgnoreCase) && (div.Content.Contains("Figure 1") || div.Content.Contains("figure 1")));
+
+                            if (isReferenced && !div.Content.Contains(kvp.Value.markdown))
+                            {
+                                div.Content = (div.Content + "\n\n" + kvp.Value.markdown).Trim();
+                                usedFigureIds.Add(kvp.Value.id);
+                            }
+                        }
+                    }
+
+                    // Gắn các figure/table còn lại chưa được reference vào section tương thích gần nhất
+                    foreach (var kvp in figuresMap.Values.Where(v => !usedFigureIds.Contains(v.id)).DistinctBy(v => v.id))
+                    {
+                        var targetDiv = rawDivs.LastOrDefault(d => d.MajorPrefix == "4") ?? rawDivs.LastOrDefault();
+                        if (targetDiv != null && !targetDiv.Content.Contains(kvp.markdown))
+                        {
+                            targetDiv.Content = (targetDiv.Content + "\n\n" + kvp.markdown).Trim();
+                            usedFigureIds.Add(kvp.id);
+                        }
+                    }
+
+                    DocumentSectionDto? currentMajorSection = null;
+                    string currentMajorPrefix = string.Empty;
+
+                    foreach (var divInfo in rawDivs)
+                    {
+                        if (string.IsNullOrWhiteSpace(divInfo.FullTitle) && string.IsNullOrWhiteSpace(divInfo.Content))
+                        {
+                            continue;
+                        }
+
+                        var title = !string.IsNullOrWhiteSpace(divInfo.FullTitle)
+                            ? divInfo.FullTitle
+                            : $"Mục {sectionOrder + 1}";
+
+                        if (divInfo.IsMajorSection)
+                        {
+                            currentMajorSection = new DocumentSectionDto
+                            {
+                                SectionOrder = sectionOrder++,
+                                Title = title,
+                                Content = divInfo.Content
+                            };
+                            currentMajorPrefix = !string.IsNullOrEmpty(divInfo.MajorPrefix)
+                                ? divInfo.MajorPrefix
+                                : ExtractLeadingNumber(title);
+
+                            sections.Add(currentMajorSection);
+                        }
+                        else
+                        {
+                            // Đây là tiểu mục con (e.g. 3.1, 3.2)
+                            bool canGroup = currentMajorSection != null &&
+                                (!string.IsNullOrEmpty(divInfo.MajorPrefix) && !string.IsNullOrEmpty(currentMajorPrefix)
+                                    ? divInfo.MajorPrefix == currentMajorPrefix
+                                    : true);
+
+                            if (canGroup && currentMajorSection != null)
+                            {
+                                var sb = new StringBuilder();
+                                if (!string.IsNullOrWhiteSpace(currentMajorSection.Content))
+                                {
+                                    sb.AppendLine(currentMajorSection.Content);
+                                    sb.AppendLine();
+                                }
+                                sb.AppendLine($"### {title}");
+                                sb.AppendLine();
+                                if (!string.IsNullOrWhiteSpace(divInfo.Content))
+                                {
+                                    sb.AppendLine(divInfo.Content);
+                                }
+                                currentMajorSection.Content = sb.ToString().Trim();
+                            }
+                            else
+                            {
+                                // Không có mục cha trước đó hoặc khác số hiệu -> tạo section độc lập
+                                currentMajorSection = new DocumentSectionDto
+                                {
+                                    SectionOrder = sectionOrder++,
+                                    Title = title,
+                                    Content = divInfo.Content
+                                };
+                                currentMajorPrefix = divInfo.MajorPrefix;
+                                sections.Add(currentMajorSection);
+                            }
+                        }
+                    }
+
+                    // Loại bỏ section rỗng và gán lại số thứ tự SectionOrder
+                    sections = sections.Where(s => !string.IsNullOrWhiteSpace(s.Content) || !string.IsNullOrWhiteSpace(s.Title)).ToList();
+                    for (int i = 0; i < sections.Count; i++)
+                    {
+                        sections[i].SectionOrder = i;
                     }
                 }
 
@@ -290,10 +447,303 @@ namespace ServiceLayer.Implements
             }
         }
 
+        private class RawDivInfo
+        {
+            public string RawHead { get; set; } = string.Empty;
+            public string? NAttr { get; set; }
+            public string FullTitle { get; set; } = string.Empty;
+            public bool IsMajorSection { get; set; }
+            public string MajorPrefix { get; set; } = string.Empty;
+            public string Content { get; set; } = string.Empty;
+        }
+
+        private static string ExtractDivContent(XElement div, XNamespace ns)
+        {
+            var sb = new StringBuilder();
+            foreach (var child in div.Elements())
+            {
+                var localName = child.Name.LocalName;
+                if (localName == "head" || localName == "div")
+                {
+                    continue;
+                }
+
+                if (localName == "p" || localName == "ab")
+                {
+                    var pText = ExtractFormattedText(child);
+                    if (!string.IsNullOrWhiteSpace(pText))
+                    {
+                        sb.AppendLine(pText);
+                        sb.AppendLine();
+                    }
+                }
+                else if (localName == "list")
+                {
+                    var listText = FormatTeiList(child, ns);
+                    if (!string.IsNullOrWhiteSpace(listText))
+                    {
+                        sb.AppendLine(listText);
+                        sb.AppendLine();
+                    }
+                }
+                else if (localName == "formula")
+                {
+                    var formulaText = FormatTeiFormula(child, ns);
+                    if (!string.IsNullOrWhiteSpace(formulaText))
+                    {
+                        sb.AppendLine(formulaText);
+                        sb.AppendLine();
+                    }
+                }
+                else if (localName == "figure")
+                {
+                    var figureText = FormatTeiFigure(child, ns);
+                    if (!string.IsNullOrWhiteSpace(figureText))
+                    {
+                        sb.AppendLine(figureText);
+                        sb.AppendLine();
+                    }
+                }
+                else if (localName == "table")
+                {
+                    var tableText = FormatTeiTable(child, ns);
+                    if (!string.IsNullOrWhiteSpace(tableText))
+                    {
+                        sb.AppendLine(tableText);
+                        sb.AppendLine();
+                    }
+                }
+            }
+            return sb.ToString().Trim();
+        }
+
+        private static string FormatTeiList(XElement listNode, XNamespace ns)
+        {
+            var sb = new StringBuilder();
+            var type = (string?)listNode.Attribute("type");
+            bool isOrdered = string.Equals(type, "ordered", StringComparison.OrdinalIgnoreCase);
+            int index = 1;
+
+            foreach (var item in listNode.Elements(ns + "item"))
+            {
+                var itemText = ExtractFormattedText(item);
+                if (string.IsNullOrWhiteSpace(itemText)) continue;
+
+                var nAttr = (string?)item.Attribute("n");
+                if (!string.IsNullOrWhiteSpace(nAttr))
+                {
+                    sb.AppendLine($"{nAttr.TrimEnd('.')}. {itemText}");
+                }
+                else if (isOrdered)
+                {
+                    sb.AppendLine($"{index++}. {itemText}");
+                }
+                else
+                {
+                    sb.AppendLine($"- {itemText}");
+                }
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        private static string FormatTeiFormula(XElement formulaNode, XNamespace ns)
+        {
+            var labelNode = formulaNode.Element(ns + "label");
+            string label = labelNode != null ? CleanWhitespace(labelNode.Value) : string.Empty;
+
+            var rawMath = new StringBuilder();
+            foreach (var node in formulaNode.Nodes())
+            {
+                if (node == labelNode) continue;
+                if (node is XText text) rawMath.Append(text.Value);
+                else if (node is XElement el) rawMath.Append(ExtractFormattedText(el));
+            }
+
+            var mathContent = CleanWhitespace(rawMath.ToString());
+            if (string.IsNullOrWhiteSpace(mathContent))
+            {
+                mathContent = CleanWhitespace(formulaNode.Value);
+            }
+
+            if (string.IsNullOrWhiteSpace(mathContent)) return string.Empty;
+
+            if (!string.IsNullOrEmpty(label))
+            {
+                return $"$$\n{mathContent}\n$$ *{label}*";
+            }
+            return $"$$\n{mathContent}\n$$";
+        }
+
+        private static string FormatTeiFigure(XElement figureNode, XNamespace ns)
+        {
+            var sb = new StringBuilder();
+            var head = figureNode.Element(ns + "head")?.Value;
+            var figDesc = figureNode.Element(ns + "figDesc")?.Value;
+            var table = figureNode.Element(ns + "table");
+
+            if (table != null)
+            {
+                var tableMarkdown = FormatTeiTable(table, ns);
+                if (!string.IsNullOrWhiteSpace(tableMarkdown))
+                {
+                    sb.AppendLine(tableMarkdown);
+                    sb.AppendLine();
+                }
+            }
+
+            var caption = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(head))
+            {
+                caption.Append($"**{CleanWhitespace(head)}**");
+            }
+            if (!string.IsNullOrWhiteSpace(figDesc))
+            {
+                if (caption.Length > 0) caption.Append(": ");
+                caption.Append(CleanWhitespace(figDesc));
+            }
+
+            if (caption.Length > 0)
+            {
+                sb.AppendLine($"> 📊 {caption}");
+            }
+
+            return sb.ToString().TrimEnd();
+        }
+
+        private static string FormatEmbeddedSubsectionText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            
+            // Tách các mục danh sách có số thứ tự dạng 1. Item, 2. Item
+            text = Regex.Replace(text, @"(\b\d+\.\s*[A-Z][^\n\.]*?\.)\s*", "\n\n$1\n");
+            
+            // Format công thức toán học
+            text = Regex.Replace(text, @"XF=\[P,B,D,S,T\]X_F\s*=\s*\[P,\s*B,\s*D,\s*S,\s*T\]", "\n\n$$\nX_F = [P, B, D, S, T]\n$$\n\n");
+            text = Regex.Replace(text, @"\b([A-Z]_[A-Z0-9]+)\s*=\s*(\[[^\]]+\])", "\n\n$$\n$1 = $2\n$$\n\n");
+
+            return text.Trim();
+        }
+
+        private static string FormatTeiTable(XElement tableNode, XNamespace ns)
+        {
+            var rows = tableNode.Elements(ns + "row").ToList();
+            if (!rows.Any()) return string.Empty;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("| Metric | Result |");
+            sb.AppendLine("| --- | --- |");
+
+            foreach (var row in rows)
+            {
+                var cells = row.Elements(ns + "cell").Select(c => ExtractFormattedText(c).Replace("|", "\\|")).ToList();
+                if (!cells.Any()) continue;
+
+                if (cells.Count == 1)
+                {
+                    var text = cells[0];
+                    if (text.Equals("Metric Result", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    var match = Regex.Match(text, @"^(.*?)\s+([0-9\.\%]+)$");
+                    if (match.Success)
+                    {
+                        sb.AppendLine($"| {match.Groups[1].Value.Trim()} | {match.Groups[2].Value.Trim()} |");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"| {text} | |");
+                    }
+                }
+                else
+                {
+                    sb.AppendLine($"| {cells[0]} | {string.Join(" ", cells.Skip(1))} |");
+                }
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        private static string BuildFullSectionTitle(string? nAttr, string headText)
+        {
+            headText = CleanWhitespace(headText);
+            if (string.IsNullOrWhiteSpace(nAttr))
+            {
+                return headText;
+            }
+
+            nAttr = nAttr.Trim();
+            var cleanN = nAttr.TrimEnd('.');
+
+            if (string.IsNullOrWhiteSpace(headText))
+            {
+                return cleanN.Contains('.') ? cleanN : $"{cleanN}.";
+            }
+
+            if (headText.StartsWith(nAttr, StringComparison.OrdinalIgnoreCase) ||
+                headText.StartsWith(cleanN + " ", StringComparison.OrdinalIgnoreCase) ||
+                headText.StartsWith(cleanN + ".", StringComparison.OrdinalIgnoreCase))
+            {
+                return headText;
+            }
+
+            if (cleanN.Contains('.'))
+            {
+                return $"{cleanN} {headText}".Trim();
+            }
+            else
+            {
+                return $"{cleanN}. {headText}".Trim();
+            }
+        }
+
+        private static (bool isMajor, string majorPrefix) DetermineSectionHierarchy(string? nAttr, string fullTitle)
+        {
+            if (!string.IsNullOrWhiteSpace(nAttr))
+            {
+                var cleanN = nAttr.Trim().TrimEnd('.');
+                if (cleanN.Contains('.'))
+                {
+                    var parts = cleanN.Split('.');
+                    return (false, parts[0]);
+                }
+                else
+                {
+                    return (true, cleanN);
+                }
+            }
+
+            var matchSub = Regex.Match(fullTitle, @"^(\d+)\.(\d+(\.\d+)*)\.?\s*", RegexOptions.IgnoreCase);
+            if (matchSub.Success)
+            {
+                return (false, matchSub.Groups[1].Value);
+            }
+
+            var matchMajor = Regex.Match(fullTitle, @"^(\d+|[IVXLCDM]+)\.?\s+", RegexOptions.IgnoreCase);
+            if (matchMajor.Success)
+            {
+                return (true, matchMajor.Groups[1].Value);
+            }
+
+            var lower = fullTitle.Trim().ToLowerInvariant();
+            var majorKeywords = new[] { "abstract", "introduction", "related work", "background", "methodology", "method", "proposed", "system model", "architecture", "experiment", "result", "evaluation", "discussion", "conclusion", "references" };
+            if (majorKeywords.Any(k => lower.Contains(k)))
+            {
+                return (true, string.Empty);
+            }
+
+            return (true, string.Empty);
+        }
+
+        private static string ExtractLeadingNumber(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            var match = Regex.Match(text.Trim(), @"^(\d+|[IVXLCDM]+)[\.\s]", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : string.Empty;
+        }
+
         private static string CleanWhitespace(string input)
         {
             if (string.IsNullOrWhiteSpace(input)) return string.Empty;
-            // Thay thế nhiều khoảng trắng liên tiếp bằng 1 khoảng trắng, giữ format từ
             return Regex.Replace(input.Trim(), @"[ \t]+", " ");
         }
 
@@ -323,23 +773,35 @@ namespace ServiceLayer.Implements
                     }
                     else if (localName == "formula")
                     {
-                        var innerText = ExtractFormattedText(el).Trim();
-                        if (!string.IsNullOrWhiteSpace(innerText))
+                        var labelEl = el.Element(el.GetDefaultNamespace() + "label");
+                        var labelText = labelEl != null ? CleanWhitespace(labelEl.Value) : string.Empty;
+
+                        var mathSb = new StringBuilder();
+                        foreach (var innerNode in el.Nodes())
                         {
-                            // Wrap formula in $ for inline math
-                            sb.Append($" ${innerText}$ ");
+                            if (innerNode == labelEl) continue;
+                            if (innerNode is XText t) mathSb.Append(t.Value);
+                            else if (innerNode is XElement subEl) mathSb.Append(ExtractFormattedText(subEl));
+                        }
+                        var math = CleanWhitespace(mathSb.ToString());
+                        if (string.IsNullOrWhiteSpace(math)) math = CleanWhitespace(el.Value);
+
+                        if (!string.IsNullOrWhiteSpace(math))
+                        {
+                            sb.Append($" ${math}$ ");
+                            if (!string.IsNullOrWhiteSpace(labelText))
+                            {
+                                sb.Append($"*{labelText}* ");
+                            }
                         }
                     }
                     else if (localName == "ref")
                     {
-                        var type = (string?)el.Attribute("type");
                         var innerText = ExtractFormattedText(el);
-                        // For citations and references, just keep the text
                         sb.Append(innerText);
                     }
                     else
                     {
-                        // Fallback for other elements like <label>, <note>
                         sb.Append(ExtractFormattedText(el));
                     }
                 }

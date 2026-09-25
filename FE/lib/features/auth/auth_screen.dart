@@ -47,13 +47,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submitForm() async {
     if (_activeTab == 0) {
-      final success = await widget.authVM.loginWithEmail(
+      await widget.authVM.loginWithEmail(
         _emailController.text.trim(),
         _passwordController.text,
       );
-      if (success && !widget.authVM.isLoggedIn && mounted) {
-        _showOtpDialog(_emailController.text.trim(), true);
-      }
     } else {
       final success = await widget.authVM.registerWithEmail(
         name: _nameController.text.trim(),

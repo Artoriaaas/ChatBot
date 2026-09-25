@@ -94,14 +94,8 @@ namespace ChatBot.Controllers
                 return Unauthorized("Email hoặc mật khẩu không đúng.");
             }
 
-            var otp = new Random().Next(100000, 999999).ToString();
-            _cache.Set($"LoginOTP_{email}", otp, TimeSpan.FromMinutes(5));
-
-            Console.WriteLine($"[AUTH OTP] Login OTP for {email}: {otp}");
-
-            await SendEmailAsync(email, "Mã xác nhận đăng nhập", $"Mã OTP của bạn là: {otp}");
-
-            return Ok(new { message = "Mã OTP đã được gửi đến email. Vui lòng xác nhận để đăng nhập." });
+            var token = GenerateJwtToken(user);
+            return Ok(new { message = "Đăng nhập thành công", token });
         }
 
         [HttpPost("verify-login")]

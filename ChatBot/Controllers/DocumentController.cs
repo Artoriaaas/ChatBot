@@ -53,10 +53,16 @@ namespace ChatBot.Controllers
         }
 
         [HttpGet("test-extract")]
-        public async Task<IActionResult> TestExtract([FromQuery] string? filePath)
+        public async Task<IActionResult> TestExtract([FromQuery] string? filePath, [FromQuery] bool save = false)
         {
             var path = filePath ?? @"D:\Upload\33282706-daf5-4713-bc51-1400ee00734f_GROBID_TEST.pdf";
             var result = await _textExtractionService.ExtractDocumentFullAsync(path);
+            if (save && result.Success && result.Sections.Count > 0)
+            {
+                var structurePath = path + ".structure.json";
+                var json = JsonSerializer.Serialize(result.Sections, new JsonSerializerOptions { WriteIndented = true });
+                await System.IO.File.WriteAllTextAsync(structurePath, json);
+            }
             return Ok(new
             {
                 success = result.Success,

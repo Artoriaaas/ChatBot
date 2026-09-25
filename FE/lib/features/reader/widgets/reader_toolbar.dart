@@ -152,7 +152,7 @@ class ReaderToolbar extends StatelessWidget {
                 ),
               ],
 
-              const Spacer(),
+              const SizedBox(width: 16),
 
               // Page Switcher Controls (< 3 / 11 >)
               IconButton(

@@ -15,7 +15,7 @@ class AuthService {
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'email': email,
+        'email': email.trim().toLowerCase(),
         'password': password,
       }),
     );
@@ -34,15 +34,17 @@ class AuthService {
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'email': email,
-        'otp': otp,
+        'email': email.trim().toLowerCase(),
+        'otp': otp.trim(),
       }),
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final token = data['token'];
-      await saveToken(token);
+      if (token != null) {
+        await saveToken(token);
+      }
       return token;
     } else {
       throw Exception('Mã OTP không hợp lệ hoặc đã hết hạn.');
@@ -56,8 +58,8 @@ class AuthService {
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'fullName': name,
-        'email': email,
+        'fullName': name.trim(),
+        'email': email.trim().toLowerCase(),
         'password': password,
       }),
     );
@@ -70,19 +72,24 @@ class AuthService {
   }
 
   /// Xác thực OTP Đăng ký
-  Future<bool> verifyRegister(String email, String otp) async {
+  Future<String?> verifyRegister(String email, String otp) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/Auth/verify-register');
     final response = await _client.post(
       url,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'email': email,
-        'otp': otp,
+        'email': email.trim().toLowerCase(),
+        'otp': otp.trim(),
       }),
     );
 
     if (response.statusCode == 200) {
-      return true;
+      final data = jsonDecode(response.body);
+      final token = data['token'];
+      if (token != null) {
+        await saveToken(token);
+      }
+      return token ?? '';
     } else {
       throw Exception('Mã OTP không hợp lệ hoặc đã hết hạn.');
     }

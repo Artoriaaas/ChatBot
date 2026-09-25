@@ -18,6 +18,7 @@ class ChatViewModel extends ChangeNotifier {
 
   ChatViewModel(this._aiService);
 
+  Paper? get currentPaper => _currentPaper;
   List<ChatMessage> get currentMessages =>
       _conversations[_currentPaperId] ?? [];
   bool get isStreaming => _isStreaming;

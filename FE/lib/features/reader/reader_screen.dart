@@ -55,8 +55,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void initState() {
     super.initState();
-    widget.readerViewModel.openPaper(widget.paper);
-    widget.chatViewModel.setCurrentPaper(widget.paper);
+    if (widget.readerViewModel.currentPaper?.id != widget.paper.id) {
+      widget.readerViewModel.openPaper(widget.paper);
+    }
+    if (widget.chatViewModel.currentPaper?.id != widget.paper.id) {
+      widget.chatViewModel.setCurrentPaper(widget.paper);
+    }
     _ensureChunksLoaded();
   }
 
@@ -117,28 +121,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.escape): () {
-              if (_isEditingNote) {
-                setState(() => _isEditingNote = false);
-                return;
-              }
-              if (_isTocOpen) {
-                setState(() => _isTocOpen = false);
-              }
-              widget.readerViewModel.clearSelection();
-            },
-          },
-      child: Focus(
-        autofocus: true,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isNarrow = constraints.maxWidth < 650;
+    final isNarrow = MediaQuery.sizeOf(context).width < 650;
 
-            return Column(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.escape): () {
+                if (_isEditingNote) {
+                  setState(() => _isEditingNote = false);
+                  return;
+                }
+                if (_isTocOpen) {
+                  setState(() => _isTocOpen = false);
+                }
+                widget.readerViewModel.clearSelection();
+              },
+            },
+            child: Column(
               children: [
                 // Top Reader Toolbar
                 ListenableBuilder(
@@ -290,13 +292,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     ],
                   ),
               ],
-            );
-          },
+            ),
+          ),
         ),
-      ),
-    ),
-    if (_isEditingNote)
-      MinimizableNoteEditor(
+        if (_isEditingNote)
+          MinimizableNoteEditor(
         strings: widget.settingsViewModel.strings,
         initialTitle: _draftNoteTitle ?? widget.settingsViewModel.strings.newNoteTitle,
         initialContent: _draftNoteContent ?? '',

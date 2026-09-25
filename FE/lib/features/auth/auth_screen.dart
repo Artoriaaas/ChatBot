@@ -48,21 +48,21 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submitForm() async {
     if (_activeTab == 0) {
       final success = await widget.authVM.loginWithEmail(
-        _emailController.text,
+        _emailController.text.trim(),
         _passwordController.text,
       );
       if (success && !widget.authVM.isLoggedIn && mounted) {
-        _showOtpDialog(_emailController.text, true);
+        _showOtpDialog(_emailController.text.trim(), true);
       }
     } else {
       final success = await widget.authVM.registerWithEmail(
-        name: _nameController.text,
-        email: _emailController.text,
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
         password: _passwordController.text,
         confirmPassword: _confirmPasswordController.text,
       );
       if (success && mounted) {
-        _showOtpDialog(_emailController.text, false);
+        _showOtpDialog(_emailController.text.trim(), false);
       }
     }
   }
@@ -227,15 +227,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
                           if (!dialogContext.mounted) return;
 
-                          if (isLogin && success) {
-                            // Đăng nhập OK → đóng dialog, vào app
+                          if (success) {
+                            // Đăng nhập / Đăng ký thành công → đóng dialog ngay
                             Navigator.pop(dialogContext);
-                          } else if (!isLogin && success) {
-                            // Đăng ký OK → đóng dialog này, hiện OTP đăng nhập
-                            Navigator.pop(dialogContext);
-                            if (mounted) {
-                              _showOtpDialog(email, true);
-                            }
                           } else {
                             setDialogState(() {
                               isSubmitting = false;

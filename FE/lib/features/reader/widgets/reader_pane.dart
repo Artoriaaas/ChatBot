@@ -423,31 +423,54 @@ class _ReaderPaneState extends State<ReaderPane> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         if (widget.currentPage > 0)
-                          OutlinedButton.icon(
-                            onPressed: () => widget.onPageChanged(widget.currentPage - 1),
-                            icon: const Icon(Icons.arrow_back, size: 14),
-                            label: Text(
-                              '${widget.strings.prevSection}: ${pages[widget.currentPage - 1].sectionTitle}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.caption,
+                          Flexible(
+                            child: OutlinedButton(
+                              onPressed: () => widget.onPageChanged(widget.currentPage - 1),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.arrow_back, size: 14),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      '${widget.strings.prevSection}: ${pages[widget.currentPage - 1].sectionTitle}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.caption,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           )
                         else
                           const SizedBox.shrink(),
-                        Text(
-                          widget.strings.pageIndicator(widget.currentPage + 1, pages.length),
-                          style: AppTypography.caption.copyWith(color: colors.textSecondary),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            widget.strings.pageIndicator(widget.currentPage + 1, pages.length),
+                            style: AppTypography.caption.copyWith(color: colors.textSecondary),
+                          ),
                         ),
                         if (widget.currentPage < pages.length - 1)
-                          ElevatedButton.icon(
-                            onPressed: () => widget.onPageChanged(widget.currentPage + 1),
-                            icon: const Icon(Icons.arrow_forward, size: 14),
-                            label: Text(
-                              '${widget.strings.nextSection}: ${pages[widget.currentPage + 1].sectionTitle}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.caption,
+                          Flexible(
+                            child: ElevatedButton(
+                              onPressed: () => widget.onPageChanged(widget.currentPage + 1),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      '${widget.strings.nextSection}: ${pages[widget.currentPage + 1].sectionTitle}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.caption,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.arrow_forward, size: 14),
+                                ],
+                              ),
                             ),
                           )
                         else

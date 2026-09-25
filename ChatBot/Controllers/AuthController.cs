@@ -36,16 +36,19 @@ namespace ChatBot.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == request.Email))
+            var email = request.Email.Trim().ToLower();
+            if (await _context.Users.AnyAsync(u => u.Email.ToLower() == email))
             {
                 return BadRequest("Email đã được sử dụng.");
             }
 
             var otp = new Random().Next(100000, 999999).ToString();
-            _cache.Set($"RegisterOTP_{request.Email}", otp, TimeSpan.FromMinutes(5));
-            _cache.Set($"RegisterData_{request.Email}", request, TimeSpan.FromMinutes(5));
+            _cache.Set($"RegisterOTP_{email}", otp, TimeSpan.FromMinutes(5));
+            _cache.Set($"RegisterData_{email}", request, TimeSpan.FromMinutes(5));
 
-            await SendEmailAsync(request.Email, "Mã xác nhận đăng ký", $"Mã OTP của bạn là: {otp}");
+            Console.WriteLine($"[AUTH OTP] Register OTP for {email}: {otp}");
+
+            await SendEmailAsync(email, "Mã xác nhận đăng ký", $"Mã OTP của bạn là: {otp}");
 
             return Ok(new { message = "Mã OTP đã được gửi đến email của bạn." });
         }
@@ -53,13 +56,16 @@ namespace ChatBot.Controllers
         [HttpPost("verify-register")]
         public async Task<IActionResult> VerifyRegister([FromBody] VerifyOtpRequest request)
         {
-            if (_cache.TryGetValue($"RegisterOTP_{request.Email}", out string? savedOtp) && savedOtp == request.Otp)
+            var email = request.Email.Trim().ToLower();
+            var otp = request.Otp.Trim();
+
+            if (_cache.TryGetValue($"RegisterOTP_{email}", out string? savedOtp) && savedOtp == otp)
             {
-                if (_cache.TryGetValue($"RegisterData_{request.Email}", out RegisterRequest? regData) && regData != null)
+                if (_cache.TryGetValue($"RegisterData_{email}", out RegisterRequest? regData) && regData != null)
                 {
                     var user = new User
                     {
-                        Email = regData.Email,
+                        Email = regData.Email.Trim().ToLower(),
                         FullName = regData.FullName,
                         PasswordHash = BCrypt.Net.BCrypt.HashPassword(regData.Password),
                         Role = Role.Student
@@ -67,10 +73,11 @@ namespace ChatBot.Controllers
                     _context.Users.Add(user);
                     await _context.SaveChangesAsync();
 
-                    _cache.Remove($"RegisterOTP_{request.Email}");
-                    _cache.Remove($"RegisterData_{request.Email}");
+                    _cache.Remove($"RegisterOTP_{email}");
+                    _cache.Remove($"RegisterData_{email}");
 
-                    return Ok(new { message = "Đăng ký thành công" });
+                    var token = GenerateJwtToken(user);
+                    return Ok(new { message = "Đăng ký thành công", token });
                 }
             }
             return BadRequest("Mã OTP không hợp lệ hoặc đã hết hạn.");
@@ -79,7 +86,8 @@ namespace ChatBot.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            var email = request.Email.Trim().ToLower();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email);
             
             if (user == null || user.PasswordHash == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
@@ -87,9 +95,11 @@ namespace ChatBot.Controllers
             }
 
             var otp = new Random().Next(100000, 999999).ToString();
-            _cache.Set($"LoginOTP_{request.Email}", otp, TimeSpan.FromMinutes(5));
+            _cache.Set($"LoginOTP_{email}", otp, TimeSpan.FromMinutes(5));
 
-            await SendEmailAsync(request.Email, "Mã xác nhận đăng nhập", $"Mã OTP của bạn là: {otp}");
+            Console.WriteLine($"[AUTH OTP] Login OTP for {email}: {otp}");
+
+            await SendEmailAsync(email, "Mã xác nhận đăng nhập", $"Mã OTP của bạn là: {otp}");
 
             return Ok(new { message = "Mã OTP đã được gửi đến email. Vui lòng xác nhận để đăng nhập." });
         }
@@ -97,13 +107,16 @@ namespace ChatBot.Controllers
         [HttpPost("verify-login")]
         public async Task<IActionResult> VerifyLogin([FromBody] VerifyOtpRequest request)
         {
-            if (_cache.TryGetValue($"LoginOTP_{request.Email}", out string? savedOtp) && savedOtp == request.Otp)
+            var email = request.Email.Trim().ToLower();
+            var otp = request.Otp.Trim();
+
+            if (_cache.TryGetValue($"LoginOTP_{email}", out string? savedOtp) && savedOtp == otp)
             {
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email);
                 if (user != null)
                 {
                     var token = GenerateJwtToken(user);
-                    _cache.Remove($"LoginOTP_{request.Email}");
+                    _cache.Remove($"LoginOTP_{email}");
                     return Ok(new { token });
                 }
             }
@@ -195,29 +208,35 @@ namespace ChatBot.Controllers
 
             if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
             {
+                Console.WriteLine("[SendEmailAsync] Email configuration missing, skipping send.");
                 return;
             }
 
-            using var client = new SmtpClient(host, port)
-            {
-                Credentials = new NetworkCredential(user, pass),
-                EnableSsl = true
-            };
-
-            var mailMessage = new MailMessage
-            {
-                From = new MailAddress(user),
-                Subject = subject,
-                Body = body,
-                IsBodyHtml = true
-            };
-            mailMessage.To.Add(toEmail);
-
             try
             {
+                using var client = new SmtpClient(host, port)
+                {
+                    Credentials = new NetworkCredential(user, pass),
+                    EnableSsl = true,
+                    Timeout = 10000
+                };
+
+                var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(user),
+                    Subject = subject,
+                    Body = body,
+                    IsBodyHtml = true
+                };
+                mailMessage.To.Add(toEmail);
+
                 await client.SendMailAsync(mailMessage);
+                Console.WriteLine($"[SendEmailAsync] Successfully sent email to {toEmail}");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SendEmailAsync] Error sending email to {toEmail}: {ex.Message}");
+            }
         }
 
         private string GenerateJwtToken(User user)

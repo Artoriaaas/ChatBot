@@ -39,7 +39,7 @@ class AuthViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    final trimmedEmail = email.trim();
+    final trimmedEmail = email.trim().toLowerCase();
     final trimmedPass = password.trim();
 
     if (trimmedEmail.isEmpty || !trimmedEmail.contains('@')) {
@@ -82,14 +82,15 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await _authService.verifyLogin(email.trim(), otp.trim());
+      final normalizedEmail = email.trim().toLowerCase();
+      final token = await _authService.verifyLogin(normalizedEmail, otp.trim());
       if (token != null && token.isNotEmpty) {
-        final namePart = email.split('@').first;
+        final namePart = normalizedEmail.split('@').first;
         final displayName = namePart[0].toUpperCase() + namePart.substring(1);
         _currentUser = UserProfile(
           id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
           name: displayName,
-          email: email.trim(),
+          email: normalizedEmail,
           avatarUrl:
               'https://ui-avatars.com/api/?name=${Uri.encodeComponent(displayName)}&background=6366f1&color=fff&bold=true',
           isGoogleAuth: false,
@@ -154,7 +155,7 @@ class AuthViewModel extends ChangeNotifier {
 
     try {
       final otpSent =
-          await _authService.register(name.trim(), email.trim(), password);
+          await _authService.register(name.trim(), email.trim().toLowerCase(), password);
       _isLoading = false;
       notifyListeners();
       return otpSent;
@@ -168,8 +169,7 @@ class AuthViewModel extends ChangeNotifier {
 
   // ─────────────────────────────────────────────────────────────
   // ĐĂNG KÝ – Bước 2: xác thực OTP để hoàn tất tạo tài khoản
-  // Sau khi verify xong → gọi login để gửi OTP đăng nhập
-  // Trả về true = user đã được tạo + OTP đăng nhập đã gửi
+  // Khi verify OTP thành công → nhận JWT token và đăng nhập trực tiếp
   // ─────────────────────────────────────────────────────────────
   Future<bool> verifyRegisterOtp(
       String email, String otp, String password) async {
@@ -178,22 +178,29 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Xác nhận OTP → backend tạo user trong database
-      final registered =
-          await _authService.verifyRegister(email.trim(), otp.trim());
-      if (!registered) {
-        _errorMessage = 'OTP không hợp lệ hoặc đã hết hạn.';
+      final normalizedEmail = email.trim().toLowerCase();
+      final token =
+          await _authService.verifyRegister(normalizedEmail, otp.trim());
+      if (token != null && token.isNotEmpty) {
+        final namePart = normalizedEmail.split('@').first;
+        final displayName = namePart[0].toUpperCase() + namePart.substring(1);
+        _currentUser = UserProfile(
+          id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
+          name: displayName,
+          email: normalizedEmail,
+          avatarUrl:
+              'https://ui-avatars.com/api/?name=${Uri.encodeComponent(displayName)}&background=6366f1&color=fff&bold=true',
+          isGoogleAuth: false,
+        );
+        _isLoggedIn = true;
         _isLoading = false;
         notifyListeners();
-        return false;
+        return true;
       }
-
-      // Sau đăng ký xong → gửi OTP đăng nhập (sẽ hiện dialog OTP lần 2)
-      final loginOtpSent =
-          await _authService.login(email.trim(), password);
+      _errorMessage = 'OTP không hợp lệ hoặc đã hết hạn.';
       _isLoading = false;
       notifyListeners();
-      return loginOtpSent;
+      return false;
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;

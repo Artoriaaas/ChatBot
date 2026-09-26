@@ -116,12 +116,14 @@ namespace ServiceLayer.Implements
             {
                 var doc = XDocument.Parse(xml);
                 var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
+                var teiHeader = doc.Descendants(ns + "teiHeader").FirstOrDefault();
+                var headerContainer = (XContainer?)teiHeader ?? (XContainer?)doc.Root ?? doc;
                 
                 // 1. Trích xuất Tiêu đề (Title)
-                var titleNode = doc.Descendants(ns + "titleStmt")
+                var titleNode = headerContainer.Descendants(ns + "titleStmt")
                     .Elements(ns + "title")
                     .FirstOrDefault(t => (string?)t.Attribute("type") == "main")
-                    ?? doc.Descendants(ns + "titleStmt").Elements(ns + "title").FirstOrDefault();
+                    ?? headerContainer.Descendants(ns + "titleStmt").Elements(ns + "title").FirstOrDefault();
 
                 if (titleNode != null && !string.IsNullOrWhiteSpace(titleNode.Value))
                 {
@@ -130,7 +132,7 @@ namespace ServiceLayer.Implements
 
                 // 2. Trích xuất Tác giả (Authors)
                 var authorNames = new List<string>();
-                var authorNodes = doc.Descendants(ns + "sourceDesc").Descendants(ns + "author");
+                var authorNodes = headerContainer.Descendants(ns + "sourceDesc").Descendants(ns + "author");
                 foreach (var author in authorNodes)
                 {
                     var persName = author.Element(ns + "persName");
@@ -151,7 +153,7 @@ namespace ServiceLayer.Implements
                 }
 
                 // 3. Trích xuất Năm xuất bản (Year)
-                var dateNode = doc.Descendants(ns + "publicationStmt").Descendants(ns + "date").FirstOrDefault();
+                var dateNode = headerContainer.Descendants(ns + "publicationStmt").Descendants(ns + "date").FirstOrDefault();
                 if (dateNode != null)
                 {
                     var whenAttr = (string?)dateNode.Attribute("when");
@@ -166,8 +168,8 @@ namespace ServiceLayer.Implements
                 }
 
                 // 4. Trích xuất Tóm tắt (Abstract)
-                var abstractNode = doc.Descendants(ns + "profileDesc").Descendants(ns + "abstract").FirstOrDefault()
-                    ?? doc.Descendants(ns + "abstract").FirstOrDefault();
+                var abstractNode = headerContainer.Descendants(ns + "profileDesc").Descendants(ns + "abstract").FirstOrDefault()
+                    ?? headerContainer.Descendants(ns + "abstract").FirstOrDefault();
 
                 var abstractBuilder = new StringBuilder();
                 if (abstractNode != null)
@@ -185,8 +187,8 @@ namespace ServiceLayer.Implements
                 result.AbstractText = abstractBuilder.ToString().Trim();
 
                 // 4.1 Trích xuất Tạp chí / Hội nghị & Thông tin xuất bản (Journal / Monograph)
-                var monogrNode = doc.Descendants(ns + "sourceDesc").Descendants(ns + "monogr").FirstOrDefault()
-                    ?? doc.Descendants(ns + "monogr").FirstOrDefault();
+                // CHỈ tìm trong teiHeader -> sourceDesc để không lấy nhầm tạp chí của References ở mục Back
+                var monogrNode = headerContainer.Descendants(ns + "sourceDesc").Descendants(ns + "monogr").FirstOrDefault();
 
                 if (monogrNode != null)
                 {
@@ -200,7 +202,7 @@ namespace ServiceLayer.Implements
                     }
 
                     var publisherNode = monogrNode.Descendants(ns + "publisher").FirstOrDefault()
-                        ?? doc.Descendants(ns + "publicationStmt").Descendants(ns + "publisher").FirstOrDefault();
+                        ?? headerContainer.Descendants(ns + "publicationStmt").Descendants(ns + "publisher").FirstOrDefault();
                     if (!string.IsNullOrWhiteSpace(publisherNode?.Value))
                     {
                         result.Publisher = CleanWhitespace(publisherNode.Value);
@@ -255,16 +257,46 @@ namespace ServiceLayer.Implements
                     }
                 }
 
-                // 4.2 Trích xuất DOI
-                var doiNode = doc.Descendants(ns + "idno")
+                // 4.2 Trích xuất DOI (CHỈ tìm trong teiHeader để tránh lấy nhầm DOI của phần References/Bibliography)
+                var doiNode = teiHeader?.Descendants(ns + "idno")
                     .FirstOrDefault(n => string.Equals((string?)n.Attribute("type"), "DOI", StringComparison.OrdinalIgnoreCase));
                 if (!string.IsNullOrWhiteSpace(doiNode?.Value))
                 {
                     result.Doi = CleanWhitespace(doiNode.Value);
                 }
+                else
+                {
+                    // Fallback cho bài báo preprint arXiv (ví dụ: cdm.dvi / astro-ph/9508025)
+                    // DOI Foundation & DataCite phân bổ tiền tố chính thức 10.48550/arXiv.{id} chuyển hướng trực tiếp tới trang arXiv
+                    var arxivNode = teiHeader?.Descendants(ns + "idno")
+                        .FirstOrDefault(n => string.Equals((string?)n.Attribute("type"), "arXiv", StringComparison.OrdinalIgnoreCase));
+
+                    string? arxivVal = arxivNode?.Value;
+                    if (string.IsNullOrWhiteSpace(arxivVal) && teiHeader != null)
+                    {
+                        var match = Regex.Match(teiHeader.ToString(), @"\barXiv:\s*([a-z\-]+/\d{7}|\d{4}\.\d{4,5}(v\d+)?)\b", RegexOptions.IgnoreCase);
+                        if (match.Success)
+                        {
+                            arxivVal = match.Groups[1].Value;
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(arxivVal))
+                    {
+                        arxivVal = CleanWhitespace(arxivVal);
+                        // Trích xuất chính xác mã định danh arXiv chuẩn: \d{4}\.\d{4,5} (chuẩn mới từ 2007) hoặc [a-z\-]+/\d{7} (chuẩn cũ)
+                        // Bỏ qua các tag phân loại như [math.AC] và version v1, v2 vì DOI DataCite của arXiv chỉ đăng ký mã gốc
+                        var idMatch = Regex.Match(arxivVal, @"([a-z\-]+/\d{7}|\d{4}\.\d{4,5})", RegexOptions.IgnoreCase);
+                        if (idMatch.Success)
+                        {
+                            var canonicalArxiv = idMatch.Groups[1].Value;
+                            result.Doi = $"10.48550/arXiv.{canonicalArxiv}";
+                        }
+                    }
+                }
 
                 // 4.3 Trích xuất Từ khóa (Keywords)
-                var keywordNodes = doc.Descendants(ns + "keywords").Descendants(ns + "term");
+                var keywordNodes = headerContainer.Descendants(ns + "keywords").Descendants(ns + "term");
                 var keywordList = new List<string>();
                 foreach (var kw in keywordNodes)
                 {

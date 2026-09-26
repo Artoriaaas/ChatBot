@@ -5,6 +5,7 @@ import 'package:paper_chat/app/theme/app_typography.dart';
 import 'package:paper_chat/features/settings/settings_view_model.dart';
 import 'package:paper_chat/models/paper.dart';
 import 'package:paper_chat/services/api_service.dart';
+import 'package:paper_chat/services/doi_service.dart';
 import 'package:paper_chat/services/settings_repository.dart';
 
 class EditPaperMetadataDialog extends StatefulWidget {
@@ -136,7 +137,7 @@ class _EditPaperMetadataDialogState extends State<EditPaperMetadataDialog> {
         keywords: keywords.isEmpty ? null : keywords,
       );
 
-      if (mounted) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop(true);
       }
     } catch (e) {
@@ -182,7 +183,11 @@ class _EditPaperMetadataDialogState extends State<EditPaperMetadataDialog> {
                   ),
                   IconButton(
                     icon: Icon(Icons.close, size: 18, color: colors.textSecondary),
-                    onPressed: () => Navigator.of(context).pop(false),
+                    onPressed: () {
+                      if (Navigator.canPop(context)) {
+                        Navigator.of(context).pop(false);
+                      }
+                    },
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   ),
@@ -245,6 +250,25 @@ class _EditPaperMetadataDialogState extends State<EditPaperMetadataDialog> {
                             controller: _doiController,
                             label: 'DOI (vd: 10.1109/...)',
                             colors: colors,
+                            suffixIcon: Tooltip(
+                              message: 'Mở liên kết DOI trong trình duyệt',
+                              child: IconButton(
+                                icon: Icon(Icons.open_in_new, size: 16, color: colors.primary),
+                                onPressed: () async {
+                                  final text = _doiController.text.trim();
+                                  if (text.isEmpty) return;
+                                  final success = await DoiService.openDoi(text);
+                                  if (!success && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Không thể mở liên kết DOI'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -327,7 +351,13 @@ class _EditPaperMetadataDialogState extends State<EditPaperMetadataDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: _isSaving ? null : () => Navigator.of(context).pop(false),
+                    onPressed: _isSaving
+                        ? null
+                        : () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.of(context).pop(false);
+                            }
+                          },
                     child: Text('Hủy', style: TextStyle(color: colors.textSecondary)),
                   ),
                   const SizedBox(width: 8),
@@ -362,6 +392,7 @@ class _EditPaperMetadataDialogState extends State<EditPaperMetadataDialog> {
     required dynamic colors,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    Widget? suffixIcon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,6 +419,7 @@ class _EditPaperMetadataDialogState extends State<EditPaperMetadataDialog> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             filled: true,
             fillColor: colors.appBackground,
+            suffixIcon: suffixIcon,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
               borderSide: BorderSide(color: colors.divider),

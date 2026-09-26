@@ -4,6 +4,7 @@ import 'package:paper_chat/app/theme/motion.dart';
 import 'package:paper_chat/features/reader/widgets/edit_paper_metadata_dialog.dart';
 import 'package:paper_chat/models/paper.dart';
 import 'package:paper_chat/services/api_service.dart';
+import 'package:paper_chat/services/doi_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PaperCard extends StatefulWidget {
@@ -224,15 +225,47 @@ class _PaperCardState extends State<PaperCard> {
                     if (widget.paper.doi != null && widget.paper.doi!.isNotEmpty) ...[
                       if (widget.paper.journal != null && widget.paper.journal!.isNotEmpty)
                         Text(' • ', style: TextStyle(color: colors.textSecondary, fontSize: 11)),
-                      Text(
-                        'DOI: ${widget.paper.doi!}',
-                        style: TextStyle(
-                          color: colors.primary.withValues(alpha: 0.85),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
+                      Tooltip(
+                        message: 'Mở bài báo gốc: ${DoiService.buildDoiUrl(widget.paper.doi!)}',
+                        child: InkWell(
+                          onTap: () async {
+                            final success = await DoiService.openDoi(widget.paper.doi!);
+                            if (!success && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Không thể mở liên kết DOI'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(3),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  DoiService.formatDisplay(widget.paper.doi!),
+                                  style: TextStyle(
+                                    color: colors.primary.withValues(alpha: 0.9),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(width: 3),
+                                Icon(
+                                  Icons.open_in_new,
+                                  size: 10,
+                                  color: colors.primary.withValues(alpha: 0.85),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],
@@ -243,14 +276,21 @@ class _PaperCardState extends State<PaperCard> {
                 Row(
                   children: [
                     Expanded(
-                      child: LinearProgressIndicator(
-                        value: widget.paper.indexProgress / 100,
-                        minHeight: 5,
-                        borderRadius: BorderRadius.circular(4),
-                        backgroundColor: colors.divider,
-                        color: widget.paper.indexStatus == 'Failed'
-                            ? Colors.red
-                            : colors.primary,
+                      child: Text(
+                        widget.paper.indexStatus == 'Failed'
+                            ? 'Chunking thất bại'
+                            : widget.paper.indexStatus == 'Processing'
+                            ? 'Đang chunking và tạo embedding...'
+                            : 'Đang chờ xử lý...',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: widget.paper.indexStatus == 'Failed'
+                              ? Colors.red
+                              : colors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -258,24 +298,23 @@ class _PaperCardState extends State<PaperCard> {
                       '${widget.paper.indexProgress}%',
                       style: TextStyle(
                         fontSize: 11,
-                        color: colors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        color: widget.paper.indexStatus == 'Failed'
+                            ? Colors.red
+                            : colors.textSecondary,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  widget.paper.indexStatus == 'Failed'
-                      ? 'Chunking thất bại'
-                      : widget.paper.indexStatus == 'Processing'
-                      ? 'Đang chunking và tạo embedding...'
-                      : 'Đang chờ xử lý...',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: widget.paper.indexStatus == 'Failed'
-                        ? Colors.red
-                        : colors.textSecondary,
-                  ),
+                const SizedBox(height: 4),
+                LinearProgressIndicator(
+                  value: widget.paper.indexProgress / 100,
+                  minHeight: 4,
+                  borderRadius: BorderRadius.circular(4),
+                  backgroundColor: colors.divider,
+                  color: widget.paper.indexStatus == 'Failed'
+                      ? Colors.red
+                      : colors.primary,
                 ),
                 const SizedBox(height: 6),
               ],
@@ -308,30 +347,34 @@ class _PaperCardState extends State<PaperCard> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
-                    child: Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: widget.paper.tags.take(3).map((tag) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colors.selectionBackground,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            tag,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: colors.onSelection,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: widget.paper.tags.map((tag) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.selectionBackground,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                tag,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colors.onSelection,
+                                ),
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
                 ],

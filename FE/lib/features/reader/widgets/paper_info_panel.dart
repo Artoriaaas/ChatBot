@@ -6,6 +6,7 @@ import 'package:paper_chat/features/reader/widgets/edit_paper_metadata_dialog.da
 import 'package:paper_chat/features/settings/settings_view_model.dart';
 import 'package:paper_chat/models/paper.dart';
 import 'package:paper_chat/services/api_service.dart';
+import 'package:paper_chat/services/doi_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PaperInfoPanel extends StatefulWidget {
@@ -50,6 +51,30 @@ class _PaperInfoPanelState extends State<PaperInfoPanel> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _handleOpenDoi(String doi) async {
+    final strings = widget.settingsVM.strings;
+    if (!DoiService.isValidDoi(doi)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(strings.doiInvalid),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final success = await DoiService.openDoi(doi);
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(strings.doiOpenError),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
@@ -396,6 +421,10 @@ class _PaperInfoPanelState extends State<PaperInfoPanel> {
   }
 
   Widget _buildDoiRow(String doi, dynamic colors) {
+    final strings = widget.settingsVM.strings;
+    final fullUrl = DoiService.buildDoiUrl(doi);
+    final displayDoi = DoiService.formatDisplay(doi);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -406,7 +435,7 @@ class _PaperInfoPanelState extends State<PaperInfoPanel> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'DOI',
+                strings.doiLabel,
                 style: AppTypography.caption.copyWith(
                   fontWeight: FontWeight.w600,
                   color: colors.textSecondary,
@@ -417,19 +446,41 @@ class _PaperInfoPanelState extends State<PaperInfoPanel> {
               Row(
                 children: [
                   Expanded(
-                    child: SelectableText(
-                      doi,
-                      style: AppTypography.caption.copyWith(
-                        fontSize: 12,
-                        color: colors.primary,
-                        decoration: TextDecoration.underline,
+                    child: Tooltip(
+                      message: '${strings.openDoiInBrowser}\n$fullUrl',
+                      child: InkWell(
+                        onTap: () => _handleOpenDoi(doi),
+                        borderRadius: BorderRadius.circular(4),
+                        mouseCursor: SystemMouseCursors.click,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2.0),
+                          child: Text(
+                            displayDoi,
+                            style: AppTypography.caption.copyWith(
+                              fontSize: 12,
+                              color: colors.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: Icon(Icons.open_in_new, size: 13, color: colors.primary),
+                    onPressed: () => _handleOpenDoi(doi),
+                    tooltip: strings.openDoiInBrowser,
+                    constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                    padding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(width: 2),
                   IconButton(
                     icon: Icon(Icons.copy, size: 13, color: colors.textSecondary),
-                    onPressed: () => _copyToClipboard(doi, 'DOI'),
-                    tooltip: 'Sao chép DOI',
+                    onPressed: () => _copyToClipboard(displayDoi, 'DOI'),
+                    tooltip: strings.copyDoiTooltip,
                     constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
                     padding: EdgeInsets.zero,
                   ),

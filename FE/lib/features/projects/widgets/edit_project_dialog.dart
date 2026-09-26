@@ -350,10 +350,10 @@ class _EditProjectDialogState extends State<EditProjectDialog> {
                       ),
                     );
                     if (confirm == true) {
-                      if (context.mounted) {
+                      if (context.mounted && Navigator.canPop(context)) {
                         Navigator.pop(context);
-                        widget.onDelete();
                       }
+                      widget.onDelete();
                     }
                   },
                   borderRadius: BorderRadius.circular(8),

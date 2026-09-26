@@ -492,33 +492,33 @@ class _AppShellState extends State<AppShell> {
                     selectedNavIndex: _selectedNavIndex,
                     onSelectNav: (idx) {
                       _onSelectNav(idx);
-                      Navigator.pop(context);
+                      if (Navigator.canPop(context)) Navigator.pop(context);
                     },
                     openPapers: _openPapers,
                     activePaper: _selectedPaper,
                     activeProject: activeProject,
                     onSelectPaper: (paper) {
                       _openPaper(paper);
-                      Navigator.pop(context);
+                      if (Navigator.canPop(context)) Navigator.pop(context);
                     },
                     onSelectProject: (proj) {
                       _onSelectProject(proj);
-                      Navigator.pop(context);
+                      if (Navigator.canPop(context)) Navigator.pop(context);
                     },
                     onAddPaperToProject: (proj) {
-                      Navigator.pop(context);
+                      if (Navigator.canPop(context)) Navigator.pop(context);
                       _showAddPapersDialogFor(proj);
                     },
                     onEditProject: (proj) {
-                      Navigator.pop(context);
+                      if (Navigator.canPop(context)) Navigator.pop(context);
                       _showEditProjectDialog(proj);
                     },
                     onNewProjectChat: (proj) {
-                      Navigator.pop(context);
+                      if (Navigator.canPop(context)) Navigator.pop(context);
                       _onOpenProjectChat(proj);
                     },
                     onCreateProject: () {
-                      Navigator.pop(context);
+                      if (Navigator.canPop(context)) Navigator.pop(context);
                       _showCreateProjectDialog();
                     },
                   ),

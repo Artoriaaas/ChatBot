@@ -6,8 +6,10 @@ import 'package:paper_chat/app/theme/app_colors.dart';
 import 'package:paper_chat/app/theme/app_typography.dart';
 import 'package:paper_chat/models/chat_message.dart';
 import 'package:paper_chat/features/chat/widgets/citation_chip.dart';
+import 'package:paper_chat/services/doi_service.dart';
 import 'package:paper_chat/shared/widgets/math_markdown_builder.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:url_launcher/url_launcher.dart';
 
 class MessageBubble extends StatelessWidget {
   final AppStrings strings;
@@ -185,6 +187,17 @@ class MessageBubble extends StatelessWidget {
                   extensionSet: md.ExtensionSet.gitHubFlavored,
                   inlineSyntaxes: [MathSyntax()],
                   builders: {'math': MathBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary))},
+                  onTapLink: (text, href, title) async {
+                    if (href == null || href.isEmpty) return;
+                    if (DoiService.isValidDoi(href)) {
+                      await DoiService.openDoi(href);
+                    } else {
+                      final uri = Uri.tryParse(href);
+                      if (uri != null && await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    }
+                  },
                   styleSheet: MarkdownStyleSheet(
                     p: AppTypography.body.copyWith(color: colors.textPrimary, height: 1.5),
                     h1: AppTypography.subtitle.copyWith(color: colors.textPrimary, fontWeight: FontWeight.bold),

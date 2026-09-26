@@ -61,6 +61,10 @@ class AppStrings {
   String get journalOrVenue => isVi ? 'Tạp chí / Hội nghị' : 'Journal / Venue';
   String get publisherLabel => isVi ? 'Nhà xuất bản' : 'Publisher';
   String get doiLabel => isVi ? 'Mã định danh DOI' : 'DOI';
+  String get openDoiInBrowser => isVi ? 'Mở bài báo gốc qua DOI' : 'Open original paper via DOI';
+  String get doiOpenError => isVi ? 'Không thể mở liên kết DOI' : 'Could not open DOI link';
+  String get doiInvalid => isVi ? 'Mã DOI không hợp lệ' : 'Invalid DOI identifier';
+  String get copyDoiTooltip => isVi ? 'Sao chép DOI' : 'Copy DOI';
   String get volumeLabel => isVi ? 'Tập (Volume)' : 'Volume';
   String get issueLabel => isVi ? 'Số (Issue)' : 'Issue';
   String get pagesLabel => isVi ? 'Số trang' : 'Pages';

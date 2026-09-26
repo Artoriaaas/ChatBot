@@ -16,6 +16,7 @@ namespace DataAccessLayer
         public DbSet<ChatHistory> ChatHistories { get; set; }
         public DbSet<ChatHistorySource> ChatHistorySources { get; set; }
         public DbSet<User> Users { get; set; }
+        public DbSet<DocumentReference> DocumentReferences { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -26,6 +26,7 @@ namespace BusinessObject.Dtos
         public string? Keywords { get; set; }
         public int TotalPages { get; set; } = 1;
         public List<DocumentSectionDto> Sections { get; set; } = new();
+        public List<DocumentReferenceDto> References { get; set; } = new();
         public string? ErrorMessage { get; set; }
         public string ExtractionEngine { get; set; } = "Unknown";
     }

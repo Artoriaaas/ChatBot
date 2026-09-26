@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.IO;
 
@@ -9,40 +10,42 @@ namespace DataAccessLayer
     {
         public AppDbContext CreateDbContext(string[] args)
         {
-            string? connectionString = null;
+            var currentDirectory = new DirectoryInfo(Directory.GetCurrentDirectory());
+            string? settingsDirectory = null;
 
-            var currentDir = Directory.GetCurrentDirectory();
-            while (!string.IsNullOrWhiteSpace(currentDir))
+            while (currentDirectory != null)
             {
-                var envPath = Path.Combine(currentDir, ".env");
-                if (File.Exists(envPath))
+                var chatbotSettingsPath = Path.Combine(currentDirectory.FullName, "ChatBot", "appsettings.json");
+                if (File.Exists(chatbotSettingsPath))
                 {
-                    try
-                    {
-                        foreach (var line in File.ReadAllLines(envPath))
-                        {
-                            var trimmed = line.Trim();
-                            if (trimmed.StartsWith("#") || !trimmed.Contains('=')) continue;
-                            var idx = trimmed.IndexOf('=');
-                            var key = trimmed[..idx].Trim();
-                            var val = trimmed[(idx + 1)..].Trim();
-                            if (key.Equals("ConnectionStrings__DefaultConnection", StringComparison.OrdinalIgnoreCase) ||
-                                key.Equals("DefaultConnection", StringComparison.OrdinalIgnoreCase))
-                            {
-                                connectionString = val;
-                                break;
-                            }
-                        }
-                    }
-                    catch { }
+                    settingsDirectory = Path.Combine(currentDirectory.FullName, "ChatBot");
                     break;
                 }
-                currentDir = Directory.GetParent(currentDir)?.FullName;
+
+                if (File.Exists(Path.Combine(currentDirectory.FullName, "appsettings.json")))
+                {
+                    settingsDirectory = currentDirectory.FullName;
+                    break;
+                }
+
+                currentDirectory = currentDirectory.Parent;
             }
 
-            connectionString ??= Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-                ?? Environment.GetEnvironmentVariable("DefaultConnection")
-                ?? "Host=localhost;Port=5432;Database=PaperdeskDb;Username=postgres;Password=12345;Trust Server Certificate=true";
+            if (settingsDirectory == null)
+            {
+                throw new FileNotFoundException("Không tìm thấy ChatBot/appsettings.json để đọc cấu hình database.");
+            }
+
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(settingsDirectory)
+                .AddJsonFile("appsettings.json", optional: false)
+                .Build();
+
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException("Thiếu ConnectionStrings:DefaultConnection trong appsettings.json.");
+            }
 
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
             optionsBuilder.UseNpgsql(connectionString, o => o.UseVector());

@@ -7,12 +7,9 @@ import 'package:paper_chat/features/chat/widgets/message_bubble.dart';
 import 'package:paper_chat/features/chat/widgets/starter_prompts.dart';
 import 'package:paper_chat/features/notes/widgets/note_editor_dialog.dart';
 import 'package:paper_chat/features/reader/reader_view_model.dart';
-import 'package:paper_chat/features/reader/widgets/references_panel.dart';
 import 'package:paper_chat/features/settings/settings_view_model.dart';
-import 'package:paper_chat/models/document_reference.dart';
 import 'package:paper_chat/models/note.dart';
 import 'package:paper_chat/models/paper.dart';
-import 'package:paper_chat/services/api_service.dart';
 import 'package:paper_chat/services/notes_repository.dart';
 
 class ChatPanel extends StatefulWidget {
@@ -27,6 +24,7 @@ class ChatPanel extends StatefulWidget {
     String? initialContent,
   })?
   onOpenNoteEditor;
+  final VoidCallback? onClose;
 
   const ChatPanel({
     super.key,
@@ -36,6 +34,7 @@ class ChatPanel extends StatefulWidget {
     required this.notesRepository,
     required this.paper,
     this.onOpenNoteEditor,
+    this.onClose,
   });
 
   @override
@@ -93,43 +92,6 @@ class _ChatPanelState extends State<ChatPanel> {
         duration: const Duration(seconds: 2),
       ),
     );
-  }
-
-  Future<void> _reloadReferences() async {
-    try {
-      final apiService = ApiService();
-      List<Map<String, dynamic>> refsData = [];
-      if (widget.paper.documentId != null) {
-        refsData = await apiService.getDocumentReferences(int.parse(widget.paper.documentId!));
-      }
-      if (refsData.isEmpty && int.tryParse(widget.paper.id) != null) {
-        refsData = await apiService.getPaperReferences(int.parse(widget.paper.id));
-      }
-      if (refsData.isNotEmpty && mounted) {
-        setState(() {
-          widget.paper.references = refsData.map((r) => DocumentReference.fromJson(r)).toList();
-        });
-        widget.readerViewModel.notifyPaperUpdated();
-        return;
-      }
-    } catch (_) {}
-
-    // Fallback: Nếu API chưa có, parse ngay từ các trang có tiêu đề Reference/Bibliography
-    if (widget.paper.references.isEmpty) {
-      for (final page in widget.paper.pages) {
-        final t = page.sectionTitle.toLowerCase();
-        if (t.contains('reference') || t.contains('tài liệu tham khảo') || t.contains('bibliography')) {
-          final parsed = DocumentReference.parseFromText(page.content);
-          if (parsed.isNotEmpty && mounted) {
-            setState(() {
-              widget.paper.references = parsed;
-            });
-            widget.readerViewModel.notifyPaperUpdated();
-            break;
-          }
-        }
-      }
-    }
   }
 
   void _openNoteEditor([Note? existingNote]) {
@@ -221,7 +183,7 @@ class _ChatPanelState extends State<ChatPanel> {
           color: colors.surface,
           child: Column(
             children: [
-              // Top Tab Header: Chat | Lịch sử | Ghi chú | Tham khảo
+              // Top Tab Header: Chat | Lịch sử | Ghi chú + Collapse Button
               Container(
                 height: 42,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -229,35 +191,46 @@ class _ChatPanelState extends State<ChatPanel> {
                   color: colors.surface,
                   border: Border(bottom: BorderSide(color: colors.divider)),
                 ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _TabHeaderButton(
-                        label: strings.chatTab,
-                        isSelected: _selectedTab == 0,
-                        onTap: () => setState(() => _selectedTab = 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _TabHeaderButton(
+                              label: strings.chatTab,
+                              isSelected: _selectedTab == 0,
+                              onTap: () => setState(() => _selectedTab = 0),
+                            ),
+                            const SizedBox(width: 16),
+                            _TabHeaderButton(
+                              label: strings.historyTab,
+                              isSelected: _selectedTab == 1,
+                              onTap: () => setState(() => _selectedTab = 1),
+                            ),
+                            const SizedBox(width: 16),
+                            _TabHeaderButton(
+                              label: strings.notesTab,
+                              isSelected: _selectedTab == 2,
+                              onTap: () => setState(() => _selectedTab = 2),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: 16),
-                      _TabHeaderButton(
-                        label: strings.historyTab,
-                        isSelected: _selectedTab == 1,
-                        onTap: () => setState(() => _selectedTab = 1),
-                      ),
-                      const SizedBox(width: 16),
-                      _TabHeaderButton(
-                        label: strings.notesTab,
-                        isSelected: _selectedTab == 2,
-                        onTap: () => setState(() => _selectedTab = 2),
-                      ),
-                      const SizedBox(width: 16),
-                      _TabHeaderButton(
-                        label: strings.references,
-                        isSelected: _selectedTab == 3,
-                        onTap: () => setState(() => _selectedTab = 3),
+                    ),
+                    if (widget.onClose != null) ...[
+                      Tooltip(
+                        message: strings.collapseChat,
+                        child: IconButton(
+                          icon: Icon(Icons.close, size: 16, color: colors.textSecondary),
+                          onPressed: widget.onClose,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
               ),
 
@@ -332,25 +305,7 @@ class _ChatPanelState extends State<ChatPanel> {
                     ? _buildChatContent(messages, colors)
                     : _selectedTab == 1
                     ? _buildHistoryContent(colors)
-                    : _selectedTab == 2
-                    ? _buildNotesContent(colors)
-                    : ReferencesPanel(
-                        settingsVM: widget.settingsVM,
-                        paper: widget.paper,
-                        onClose: () => setState(() => _selectedTab = 0),
-                        onJumpToCitation: (ref) {
-                          final jumped = widget.readerViewModel.jumpToCitationByReference(ref.refKey, ref.label);
-                          if (!jumped && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(widget.settingsVM.strings.citationMentionNotFound),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          }
-                        },
-                        onReload: _reloadReferences,
-                      ),
+                    : _buildNotesContent(colors),
               ),
             ],
           ),

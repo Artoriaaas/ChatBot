@@ -17,6 +17,8 @@ class ReaderToolbar extends StatelessWidget {
   final bool isInfoOpen;
   final VoidCallback? onToggleReferences;
   final bool isReferencesOpen;
+  final VoidCallback? onToggleChat;
+  final bool isChatOpen;
   final ReaderViewMode viewMode;
   final ValueChanged<ReaderViewMode>? onViewModeChanged;
   final int currentPage;
@@ -48,6 +50,8 @@ class ReaderToolbar extends StatelessWidget {
     this.isInfoOpen = false,
     this.onToggleReferences,
     this.isReferencesOpen = false,
+    this.onToggleChat,
+    this.isChatOpen = true,
     this.viewMode = ReaderViewMode.ai,
     this.onViewModeChanged,
     required this.currentPage,
@@ -88,10 +92,9 @@ class ReaderToolbar extends StatelessWidget {
             color: colors.surface,
             border: Border(bottom: BorderSide(color: colors.divider)),
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
+          child: Row(
+            children: [
+              // --- Left Drawers: Mục lục | Thông tin bài báo | Tài liệu tham khảo ---
               // Table of Contents Toggle Button
               Tooltip(
                 message: strings.tableOfContents,
@@ -118,7 +121,7 @@ class ReaderToolbar extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Paper Info Toggle Button
               if (onToggleInfo != null) ...[
@@ -147,7 +150,7 @@ class ReaderToolbar extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
               ],
 
               // References Toggle Button
@@ -177,261 +180,308 @@ class ReaderToolbar extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
               ],
 
-              // View Mode Selector (AI vs Original PDF vs Split View)
-              Container(
-                height: 28,
-                decoration: BoxDecoration(
-                  color: colors.appBackground,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: colors.divider),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildViewModeButton(
-                      mode: ReaderViewMode.ai,
-                      currentMode: viewMode,
-                      icon: Icons.article_outlined,
-                      label: strings.aiContent,
-                      onTap: () => onViewModeChanged?.call(ReaderViewMode.ai),
-                      colors: colors,
-                    ),
-                    _buildViewModeButton(
-                      mode: ReaderViewMode.original,
-                      currentMode: viewMode,
-                      icon: Icons.picture_as_pdf_outlined,
-                      label: strings.originalFile,
-                      onTap: () => onViewModeChanged?.call(ReaderViewMode.original),
-                      colors: colors,
-                    ),
-                    _buildViewModeButton(
-                      mode: ReaderViewMode.split,
-                      currentMode: viewMode,
-                      icon: Icons.vertical_split_outlined,
-                      label: strings.splitView,
-                      onTap: () => onViewModeChanged?.call(ReaderViewMode.split),
-                      colors: colors,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
+              // Divider between Left Zone and Middle Controls
+              Container(height: 18, width: 1, color: colors.divider),
+              const SizedBox(width: 6),
 
-              // Search in PDF input box
-              SizedBox(
-                width: 140,
-                height: 28,
-                child: TextField(
-                  onChanged: onSearch,
-                  style: AppTypography.caption.copyWith(color: colors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: strings.searchInPdf,
-                    hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.7)),
-                    prefixIcon: Icon(Icons.search, size: 14, color: colors.textSecondary),
-                    contentPadding: EdgeInsets.zero,
-                    filled: true,
-                    fillColor: colors.appBackground,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.divider),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.divider),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.primary),
-                    ),
-                  ),
-                ),
-              ),
-
-              if (searchQuery.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                Text(
-                  searchResultCount > 0 ? '${currentSearchIndex + 1}/$searchResultCount' : '0/0',
-                  style: AppTypography.caption.copyWith(color: colors.textSecondary, fontSize: 11),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_up, size: 16),
-                  onPressed: onPrevSearchResult,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                  padding: EdgeInsets.zero,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_down, size: 16),
-                  onPressed: onNextSearchResult,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
-
-              const SizedBox(width: 16),
-
-              // Page Switcher Controls (< 3 / 11 >)
-              IconButton(
-                icon: const Icon(Icons.chevron_left, size: 18),
-                onPressed: currentPage > 0 ? onPrevPage : null,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                padding: EdgeInsets.zero,
-              ),
-              Container(
-                width: 32,
-                height: 24,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colors.appBackground,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: colors.divider),
-                ),
-                child: TextField(
-                  controller: pageController,
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  style: AppTypography.caption.copyWith(fontWeight: FontWeight.w600),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    isDense: true,
-                  ),
-                  onSubmitted: (val) {
-                    final page = int.tryParse(val);
-                    if (page != null) onGoToPage(page - 1);
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  '/$totalPages',
-                  style: AppTypography.caption.copyWith(color: colors.textSecondary),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right, size: 18),
-                onPressed: currentPage < totalPages - 1 ? onNextPage : null,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                padding: EdgeInsets.zero,
-              ),
-
-              const SizedBox(width: 12),
-              Container(height: 16, width: 1, color: colors.divider),
-              const SizedBox(width: 12),
-
-              // Zoom Controls (- 110% +)
-              IconButton(
-                icon: const Icon(Icons.remove, size: 16),
-                onPressed: onZoomOut,
-                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                padding: EdgeInsets.zero,
-              ),
-              SizedBox(
-                width: 44,
-                child: Text(
-                  '${(zoomLevel * 100).toInt()}%',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.caption.copyWith(fontWeight: FontWeight.w500),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add, size: 16),
-                onPressed: onZoomIn,
-                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                padding: EdgeInsets.zero,
-              ),
-
-              // Continuous / Paged View Mode Toggle
-              Tooltip(
-                message: isContinuousMode ? strings.pagedMode : strings.continuousMode,
-                child: OutlinedButton.icon(
-                  onPressed: onToggleContinuousMode,
-                  icon: Icon(
-                    isContinuousMode ? Icons.view_agenda_outlined : Icons.menu_book_outlined,
-                    size: 14,
-                    color: colors.textSecondary,
-                  ),
-                  label: Text(
-                    isContinuousMode ? strings.continuousMode : strings.pagedMode,
-                    style: AppTypography.caption,
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    side: BorderSide(color: colors.divider),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Fit width button
-              Tooltip(
-                message: strings.fitWidth,
-                child: OutlinedButton.icon(
-                  onPressed: onFitWidth,
-                  icon: Icon(Icons.aspect_ratio_rounded, size: 14, color: colors.textSecondary),
-                  label: Text(strings.fitWidth, style: AppTypography.caption),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    side: BorderSide(color: colors.divider),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Highlight Tool button
-              Tooltip(
-                message: strings.highlight,
-                child: TextButton.icon(
-                  onPressed: onToggleHighlightMode,
-                  icon: Icon(
-                    Icons.border_color_outlined,
-                    size: 14,
-                    color: isHighlightMode ? colors.onHighlight : colors.textSecondary,
-                  ),
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
+              // --- Middle Zone: Reading tools (Scrollable horizontally if needed) ---
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
                     children: [
-                      Text(
-                        strings.highlight,
-                        style: AppTypography.caption.copyWith(
-                          color: isHighlightMode ? colors.onHighlight : colors.textPrimary,
-                          fontWeight: isHighlightMode ? FontWeight.w600 : FontWeight.w400,
+                      // View Mode Selector (AI vs Original PDF vs Split View)
+                      Container(
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: colors.appBackground,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: colors.divider),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildViewModeButton(
+                              mode: ReaderViewMode.ai,
+                              currentMode: viewMode,
+                              icon: Icons.article_outlined,
+                              label: strings.aiContent,
+                              onTap: () => onViewModeChanged?.call(ReaderViewMode.ai),
+                              colors: colors,
+                            ),
+                            _buildViewModeButton(
+                              mode: ReaderViewMode.original,
+                              currentMode: viewMode,
+                              icon: Icons.picture_as_pdf_outlined,
+                              label: strings.originalFile,
+                              onTap: () => onViewModeChanged?.call(ReaderViewMode.original),
+                              colors: colors,
+                            ),
+                            _buildViewModeButton(
+                              mode: ReaderViewMode.split,
+                              currentMode: viewMode,
+                              icon: Icons.vertical_split_outlined,
+                              label: strings.splitView,
+                              onTap: () => onViewModeChanged?.call(ReaderViewMode.split),
+                              colors: colors,
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 2),
-                      Icon(
-                        Icons.arrow_drop_down,
-                        size: 14,
-                        color: isHighlightMode ? colors.onHighlight : colors.textSecondary,
+                      const SizedBox(width: 8),
+
+                      // Search in PDF input box
+                      SizedBox(
+                        width: 125,
+                        height: 28,
+                        child: TextField(
+                          onChanged: onSearch,
+                          style: AppTypography.caption.copyWith(color: colors.textPrimary),
+                          decoration: InputDecoration(
+                            hintText: strings.searchInPdf,
+                            hintStyle: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.7)),
+                            prefixIcon: Icon(Icons.search, size: 14, color: colors.textSecondary),
+                            contentPadding: EdgeInsets.zero,
+                            filled: true,
+                            fillColor: colors.appBackground,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: BorderSide(color: colors.divider),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: BorderSide(color: colors.divider),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(6),
+                              borderSide: BorderSide(color: colors.primary),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      if (searchQuery.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          searchResultCount > 0 ? '${currentSearchIndex + 1}/$searchResultCount' : '0/0',
+                          style: AppTypography.caption.copyWith(color: colors.textSecondary, fontSize: 11),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_up, size: 16),
+                          onPressed: onPrevSearchResult,
+                          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                          padding: EdgeInsets.zero,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_down, size: 16),
+                          onPressed: onNextSearchResult,
+                          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+
+                      const SizedBox(width: 10),
+
+                      // Page Switcher Controls (< 3 / 11 >)
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left, size: 18),
+                        onPressed: currentPage > 0 ? onPrevPage : null,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        padding: EdgeInsets.zero,
+                      ),
+                      Container(
+                        width: 32,
+                        height: 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: colors.appBackground,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: colors.divider),
+                        ),
+                        child: TextField(
+                          controller: pageController,
+                          textAlign: TextAlign.center,
+                          keyboardType: TextInputType.number,
+                          style: AppTypography.caption.copyWith(fontWeight: FontWeight.w600),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                          onSubmitted: (val) {
+                            final page = int.tryParse(val);
+                            if (page != null) onGoToPage(page - 1);
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          '/$totalPages',
+                          style: AppTypography.caption.copyWith(color: colors.textSecondary),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right, size: 18),
+                        onPressed: currentPage < totalPages - 1 ? onNextPage : null,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        padding: EdgeInsets.zero,
+                      ),
+
+                      const SizedBox(width: 8),
+                      Container(height: 16, width: 1, color: colors.divider),
+                      const SizedBox(width: 8),
+
+                      // Zoom Controls (- 110% +)
+                      IconButton(
+                        icon: const Icon(Icons.remove, size: 16),
+                        onPressed: onZoomOut,
+                        constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                        padding: EdgeInsets.zero,
+                      ),
+                      SizedBox(
+                        width: 44,
+                        child: Text(
+                          '${(zoomLevel * 100).toInt()}%',
+                          textAlign: TextAlign.center,
+                          style: AppTypography.caption.copyWith(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add, size: 16),
+                        onPressed: onZoomIn,
+                        constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                        padding: EdgeInsets.zero,
+                      ),
+
+                      const SizedBox(width: 6),
+
+                      // Continuous / Paged View Mode Toggle
+                      Tooltip(
+                        message: isContinuousMode ? strings.pagedMode : strings.continuousMode,
+                        child: OutlinedButton.icon(
+                          onPressed: onToggleContinuousMode,
+                          icon: Icon(
+                            isContinuousMode ? Icons.view_agenda_outlined : Icons.menu_book_outlined,
+                            size: 14,
+                            color: colors.textSecondary,
+                          ),
+                          label: Text(
+                            isContinuousMode ? strings.continuousMode : strings.pagedMode,
+                            style: AppTypography.caption,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            side: BorderSide(color: colors.divider),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 6),
+
+                      // Fit width button
+                      Tooltip(
+                        message: strings.fitWidth,
+                        child: OutlinedButton.icon(
+                          onPressed: onFitWidth,
+                          icon: Icon(Icons.aspect_ratio_rounded, size: 14, color: colors.textSecondary),
+                          label: Text(strings.fitWidth, style: AppTypography.caption),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            side: BorderSide(color: colors.divider),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 6),
+
+                      // Highlight Tool button
+                      Tooltip(
+                        message: strings.highlight,
+                        child: TextButton.icon(
+                          onPressed: onToggleHighlightMode,
+                          icon: Icon(
+                            Icons.border_color_outlined,
+                            size: 14,
+                            color: isHighlightMode ? colors.onHighlight : colors.textSecondary,
+                          ),
+                          label: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                strings.highlight,
+                                style: AppTypography.caption.copyWith(
+                                  color: isHighlightMode ? colors.onHighlight : colors.textPrimary,
+                                  fontWeight: isHighlightMode ? FontWeight.w600 : FontWeight.w400,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Icon(
+                                Icons.arrow_drop_down,
+                                size: 14,
+                                color: isHighlightMode ? colors.onHighlight : colors.textSecondary,
+                              ),
+                            ],
+                          ),
+                          style: TextButton.styleFrom(
+                            backgroundColor: isHighlightMode ? colors.highlightBackground : Colors.transparent,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  style: TextButton.styleFrom(
-                    backgroundColor: isHighlightMode ? colors.highlightBackground : Colors.transparent,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                  ),
                 ),
               ),
+
+              // --- Right Zone: Pinned to the far right (Trợ lý AI) ---
+              if (onToggleChat != null) ...[
+                const SizedBox(width: 6),
+                Container(height: 18, width: 1, color: colors.divider),
+                const SizedBox(width: 6),
+                Tooltip(
+                  message: isChatOpen ? strings.collapseChat : strings.expandChat,
+                  child: TextButton.icon(
+                    onPressed: onToggleChat,
+                    icon: Icon(
+                      Icons.chat_outlined,
+                      size: 16,
+                      color: isChatOpen ? colors.primary : colors.textSecondary,
+                    ),
+                    label: Text(
+                      strings.aiAssistant,
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: isChatOpen ? FontWeight.w600 : FontWeight.w400,
+                        color: isChatOpen ? colors.primary : colors.textPrimary,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: isChatOpen ? colors.selectionBackground : Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
-        ),
-      );
+        );
     },
   );
 }

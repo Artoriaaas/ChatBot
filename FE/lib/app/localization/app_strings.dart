@@ -161,6 +161,9 @@ class AppStrings {
   String get headingText => isVi ? 'Tiêu đề' : 'Heading';
 
   // Chat Panel & Messages
+  String get aiAssistant => isVi ? 'Trợ lý AI' : 'AI Assistant';
+  String get collapseChat => isVi ? 'Thu gọn khung chat' : 'Collapse chat';
+  String get expandChat => isVi ? 'Mở khung chat' : 'Expand chat';
   String get chatTab => isVi ? 'Chat' : 'Chat';
   String get historyTab => isVi ? 'Lịch sử' : 'History';
   String get notesTab => isVi ? 'Ghi chú' : 'Notes';

@@ -53,6 +53,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _isTocOpen = false;
   bool _isInfoOpen = false;
   bool _isReferencesOpen = false;
+  bool _isChatOpen = true;
   ReaderViewMode _viewMode = ReaderViewMode.ai;
   bool _isHighlightMode = false;
   int _activeNarrowTab = 0; // 0=reader, 1=chat (for narrow mode)
@@ -137,6 +138,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _handleAskAi() {
     if (widget.readerViewModel.selectedText != null) {
       widget.chatViewModel.setSelectedText(widget.readerViewModel.selectedText);
+      setState(() => _isChatOpen = true);
     }
   }
 
@@ -146,6 +148,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       widget.chatViewModel.setSelectedText(text);
       final isVi = widget.settingsViewModel.strings.isVi;
       widget.chatViewModel.sendMessage(isVi ? 'Giải thích đoạn văn này: "$text"' : 'Explain this text: "$text"');
+      setState(() => _isChatOpen = true);
     }
   }
 
@@ -155,6 +158,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       widget.chatViewModel.setSelectedText(text);
       final isVi = widget.settingsViewModel.strings.isVi;
       widget.chatViewModel.sendMessage(isVi ? 'Tóm tắt đoạn văn này: "$text"' : 'Summarize this text: "$text"');
+      setState(() => _isChatOpen = true);
     }
   }
 
@@ -226,6 +230,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       }
                     }),
                     isReferencesOpen: _isReferencesOpen,
+                    onToggleChat: () => setState(() => _isChatOpen = !_isChatOpen),
+                    isChatOpen: _isChatOpen,
                     viewMode: _viewMode,
                     onViewModeChanged: (mode) => setState(() => _viewMode = mode),
                     currentPage: widget.readerViewModel.currentPage,
@@ -341,7 +347,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         ),
 
                       // Resizable Right Panel (Chat & Notes)
-                      if (!isNarrow && _activeNarrowTab != 1) ...[
+                      if (!isNarrow && _activeNarrowTab != 1 && _isChatOpen) ...[
                         VerticalDragHandle(
                           onDragUpdate: (delta) {
                             setState(() {
@@ -358,6 +364,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             notesRepository: widget.notesRepository,
                             paper: widget.paper,
                             onOpenNoteEditor: _openNoteEditor,
+                            onClose: () => setState(() => _isChatOpen = false),
                           ),
                         ),
                       ],

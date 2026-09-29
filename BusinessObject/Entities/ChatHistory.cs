@@ -21,6 +21,10 @@ namespace BusinessObject.Entities
 
         public int? DocumentId { get; set; }
 
+        public Guid? SessionId { get; set; }
+
+        public virtual ChatSession? Session { get; set; }
+
         public int PromptTokens { get; set; }
 
         public int CompletionTokens { get; set; }

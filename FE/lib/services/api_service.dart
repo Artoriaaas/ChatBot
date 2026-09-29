@@ -289,12 +289,14 @@ class ApiService {
     required String question,
     int? documentId,
     String? userId,
+    String? sessionId,
   }) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/chat/ask');
     final body = jsonEncode({
       'question': question,
       if (documentId != null) 'documentId': documentId,
       if (userId != null) 'userId': userId,
+      if (sessionId != null && sessionId.isNotEmpty) 'sessionId': sessionId,
     });
 
     final response = await _client.post(
@@ -312,15 +314,114 @@ class ApiService {
     }
   }
 
+  /// Lấy danh sách các cuộc trò chuyện (Sessions)
+  Future<List<Map<String, dynamic>>> getChatSessions({
+    int? documentId,
+    String? userId,
+    int take = 50,
+  }) async {
+    final queryParams = <String, String>{
+      if (userId != null) 'userId': userId,
+      if (documentId != null) 'documentId': documentId.toString(),
+      'take': take.toString(),
+    };
+
+    final url = Uri.parse('${ApiConfig.baseUrl}/chat/sessions')
+        .replace(queryParameters: queryParams);
+    final response = await _client.get(url, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      final List<dynamic> jsonList = jsonDecode(response.body);
+      return jsonList.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception(
+        'Lỗi lấy danh sách phiên chat (${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  /// Lấy chi tiết cuộc trò chuyện và toàn bộ tin nhắn
+  Future<Map<String, dynamic>> getChatSessionDetails(String sessionId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/chat/sessions/$sessionId');
+    final response = await _client.get(url, headers: await _getHeaders());
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception(
+        'Lỗi lấy chi tiết phiên chat (${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  /// Tạo một cuộc trò chuyện mới
+  Future<Map<String, dynamic>> createChatSession({
+    int? documentId,
+    String? title,
+    String? userId,
+  }) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/chat/sessions');
+    final body = jsonEncode({
+      if (documentId != null) 'documentId': documentId,
+      if (title != null) 'title': title,
+      if (userId != null) 'userId': userId,
+    });
+
+    final response = await _client.post(
+      url,
+      headers: await _getHeaders({'Content-Type': 'application/json'}),
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception(
+        'Lỗi tạo phiên chat mới (${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  /// Xóa một cuộc trò chuyện
+  Future<void> deleteChatSession(String sessionId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/chat/sessions/$sessionId');
+    final response = await _client.delete(url, headers: await _getHeaders());
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Lỗi xóa phiên chat (${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
+  /// Đổi tên cuộc trò chuyện
+  Future<void> updateChatSessionTitle(String sessionId, String title) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/chat/sessions/$sessionId/title');
+    final body = jsonEncode({'title': title});
+    final response = await _client.put(
+      url,
+      headers: await _getHeaders({'Content-Type': 'application/json'}),
+      body: body,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Lỗi đổi tên phiên chat (${response.statusCode}): ${response.body}',
+      );
+    }
+  }
+
   /// Lấy lịch sử hỏi đáp từ Backend
   Future<List<Map<String, dynamic>>> getHistory({
     String? userId,
     int take = 20,
     int? documentId,
+    String? sessionId,
   }) async {
     final queryParams = <String, String>{
       if (userId != null) 'userId': userId,
       if (documentId != null) 'documentId': documentId.toString(),
+      if (sessionId != null) 'sessionId': sessionId,
       'take': take.toString(),
     };
 

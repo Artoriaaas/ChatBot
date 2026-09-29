@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:paper_chat/models/chat_message.dart';
+import 'package:paper_chat/models/chat_session.dart';
 import 'package:paper_chat/models/paper.dart';
 import 'package:paper_chat/services/api_service.dart';
 import 'package:paper_chat/services/mock_ai_service.dart';
@@ -12,6 +13,9 @@ class ChatViewModel extends ChangeNotifier {
 
   final Map<String, List<ChatMessage>> _conversations = {};
   List<Map<String, dynamic>> _chatHistory = [];
+  List<ChatSessionSummary> _chatSessions = [];
+  String? _currentSessionId;
+  String? _currentSessionTitle;
   String? _currentPaperId;
   Paper? _currentPaper;
   bool _isStreaming = false;
@@ -25,9 +29,12 @@ class ChatViewModel extends ChangeNotifier {
   ChatViewModel(this._aiService, [this._apiService]);
 
   Paper? get currentPaper => _currentPaper;
+  String? get currentSessionId => _currentSessionId;
+  String? get currentSessionTitle => _currentSessionTitle;
   List<ChatMessage> get currentMessages =>
       _conversations[_currentPaperId] ?? [];
   List<Map<String, dynamic>> get chatHistory => _chatHistory;
+  List<ChatSessionSummary> get chatSessions => _chatSessions;
   bool get isStreaming => _isStreaming;
   bool get isHistoryLoading => _isHistoryLoading;
   String? get historyError => _historyError;
@@ -39,6 +46,9 @@ class ChatViewModel extends ChangeNotifier {
     if (changedPaper) {
       stopStreaming();
       _chatHistory = [];
+      _chatSessions = [];
+      _currentSessionId = null;
+      _currentSessionTitle = null;
       _historyError = null;
       _isHistoryLoading = false;
     }
@@ -46,14 +56,25 @@ class ChatViewModel extends ChangeNotifier {
     _currentPaper = paper;
     notifyListeners();
     if (changedPaper) {
-      unawaited(loadChatHistory());
+      unawaited(loadChatSessions());
     }
   }
 
-  Future<void> loadChatHistory() async {
+  void startNewSession() {
+    stopStreaming();
+    _currentSessionId = null;
+    _currentSessionTitle = null;
+    if (_currentPaperId != null) {
+      _conversations[_currentPaperId!] = [];
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadChatSessions() async {
     final requestVersion = ++_historyRequestVersion;
     final documentId = int.tryParse(_currentPaper?.documentId ?? '');
     if (_apiService == null || documentId == null) {
+      _chatSessions = [];
       _chatHistory = [];
       _isHistoryLoading = false;
       _historyError = null;
@@ -66,12 +87,23 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final history = await _apiService.getHistory(
+      final sessionsRaw = await _apiService.getChatSessions(
         documentId: documentId,
-        take: 100,
+        take: 50,
       );
       if (requestVersion != _historyRequestVersion) return;
-      _chatHistory = history;
+
+      _chatSessions = sessionsRaw
+          .map((s) => ChatSessionSummary.fromJson(s))
+          .toList();
+
+      // Đồng thời nạp lịch sử legacy để fallback nếu chưa có session nào
+      final legacyHistory = await _apiService.getHistory(
+        documentId: documentId,
+        take: 50,
+      );
+      if (requestVersion != _historyRequestVersion) return;
+      _chatHistory = legacyHistory;
     } catch (error) {
       if (requestVersion != _historyRequestVersion) return;
       _historyError = error.toString();
@@ -81,6 +113,46 @@ class ChatViewModel extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  Future<void> selectSession(String sessionId) async {
+    if (_apiService == null || _currentPaperId == null) return;
+
+    try {
+      final rawDetails = await _apiService.getChatSessionDetails(sessionId);
+      final details = ChatSessionDetails.fromJson(
+        rawDetails,
+        paperId: _currentPaper?.documentId ?? _currentPaperId,
+        pages: _currentPaper?.pages ?? [],
+      );
+
+      _currentSessionId = details.id;
+      _currentSessionTitle = details.title;
+      _conversations[_currentPaperId!] = details.messages;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[ChatViewModel] Lỗi tải chi tiết phiên chat: $e');
+    }
+  }
+
+  Future<void> deleteSession(String sessionId) async {
+    if (_apiService == null) return;
+
+    try {
+      await _apiService.deleteChatSession(sessionId);
+      _chatSessions.removeWhere((s) => s.id == sessionId);
+      if (_currentSessionId == sessionId) {
+        startNewSession();
+      } else {
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[ChatViewModel] Lỗi xóa phiên chat: $e');
+    }
+  }
+
+  Future<void> loadChatHistory() async {
+    await loadChatSessions();
   }
 
   void setSelectedText(String? text) {
@@ -127,11 +199,14 @@ class ChatViewModel extends ChangeNotifier {
     _isStreaming = true;
     notifyListeners();
 
+    final activeSession = _currentSessionId;
+
     final stream = _aiService.askQuestion(
       paperId: _currentPaper?.documentId ?? paperId,
       question: text,
       selectedText: _selectedTextForChat,
       pages: _currentPaper!.pages,
+      sessionId: activeSession,
     );
 
     _streamSub = stream.listen(
@@ -141,13 +216,23 @@ class ChatViewModel extends ChangeNotifier {
         final idx = msgs.indexWhere((m) => m.id == assistantMsg.id);
         if (idx < 0) return;
 
+        if (event.sessionId != null && event.sessionId!.isNotEmpty) {
+          _currentSessionId = event.sessionId;
+          if (_currentSessionTitle == null ||
+              _currentSessionTitle == 'Cuộc trò chuyện mới') {
+            _currentSessionTitle = text.length > 50
+                ? '${text.substring(0, 47)}...'
+                : text;
+          }
+        }
+
         if (event.isDone) {
           msgs[idx] = msgs[idx].copyWith(
             isStreaming: false,
             citations: event.citations ?? [],
           );
           _isStreaming = false;
-          unawaited(loadChatHistory());
+          unawaited(loadChatSessions());
         } else {
           msgs[idx] = msgs[idx].copyWith(
             content: msgs[idx].content + event.textChunk,

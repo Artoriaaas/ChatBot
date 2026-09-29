@@ -6,11 +6,13 @@ class AiStreamEvent {
   final String textChunk;
   final List<Citation>? citations;
   final bool isDone;
+  final String? sessionId;
   
   const AiStreamEvent({
     required this.textChunk,
     this.citations,
     this.isDone = false,
+    this.sessionId,
   });
 }
 
@@ -20,6 +22,7 @@ abstract class AiService {
     required String question,
     String? selectedText,
     required List<PaperPage> pages,
+    String? sessionId,
   });
 }
 
@@ -171,6 +174,7 @@ class MockAiService implements AiService {
     required String question,
     String? selectedText,
     required List<PaperPage> pages,
+    String? sessionId,
   }) {
     final controller = StreamController<AiStreamEvent>();
     Timer? timer;

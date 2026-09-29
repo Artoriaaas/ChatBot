@@ -9,6 +9,7 @@ namespace ServiceLayer.Interfaces
             Guid? subjectId = null,
             Guid? chapterId = null,
             int? documentId = null,
-            string? userId = null);
+            string? userId = null,
+            Guid? sessionId = null);
     }
 }

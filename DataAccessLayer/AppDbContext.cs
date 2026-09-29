@@ -17,6 +17,7 @@ namespace DataAccessLayer
         public DbSet<ChatHistorySource> ChatHistorySources { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<DocumentReference> DocumentReferences { get; set; }
+        public DbSet<ChatSession> ChatSessions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -40,6 +41,12 @@ namespace DataAccessLayer
                 .HasOne(chs => chs.DocumentChunk)
                 .WithMany()
                 .HasForeignKey(chs => chs.DocumentChunkId);
+
+            modelBuilder.Entity<ChatHistory>()
+                .HasOne(ch => ch.Session)
+                .WithMany(s => s.Messages)
+                .HasForeignKey(ch => ch.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

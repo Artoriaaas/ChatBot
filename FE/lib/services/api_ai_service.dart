@@ -17,6 +17,7 @@ class ApiAiService implements AiService {
     required String question,
     String? selectedText,
     required List<PaperPage> pages,
+    String? sessionId,
   }) {
     final controller = StreamController<AiStreamEvent>();
 
@@ -26,6 +27,7 @@ class ApiAiService implements AiService {
       question: question,
       selectedText: selectedText,
       pages: pages,
+      sessionId: sessionId,
     );
 
     return controller.stream;
@@ -37,6 +39,7 @@ class ApiAiService implements AiService {
     required String question,
     String? selectedText,
     required List<PaperPage> pages,
+    String? sessionId,
   }) async {
     final intDocId = int.tryParse(paperId);
 
@@ -48,9 +51,11 @@ class ApiAiService implements AiService {
       final result = await _apiService.askQuestion(
         question: fullQuestion,
         documentId: intDocId,
+        sessionId: sessionId,
       );
 
       final answerText = (result['answer'] as String?) ?? 'Không có câu trả lời.';
+      final returnedSessionId = result['sessionId']?.toString() ?? sessionId;
       final rawSources = (result['sources'] as List<dynamic>?)?.cast<String>() ?? [];
       final rawChunks = (result['retrievedChunks'] as List<dynamic>?) ?? [];
       
@@ -102,6 +107,7 @@ class ApiAiService implements AiService {
           textChunk: chunk,
           citations: isLast ? citations : null,
           isDone: isLast,
+          sessionId: returnedSessionId,
         ));
 
         await Future.delayed(const Duration(milliseconds: 30));
@@ -118,6 +124,7 @@ class ApiAiService implements AiService {
         question: question,
         selectedText: selectedText,
         pages: pages,
+        sessionId: sessionId,
       );
 
       mockStream.listen(

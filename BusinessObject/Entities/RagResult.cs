@@ -19,6 +19,7 @@ namespace BusinessObject.Entities
         public List<string> Sources { get; set; } = new();
         public List<DocumentChunk> RetrievedChunks { get; set; } = new();
         public List<BusinessObject.Dtos.RagChunkDto> CitedChunks { get; set; } = new();
+        public Guid? SessionId { get; set; }
     }
 
 }

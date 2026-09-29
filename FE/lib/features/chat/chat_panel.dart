@@ -234,10 +234,10 @@ class _ChatPanelState extends State<ChatPanel> {
                 ),
               ),
 
-              // Scope Sub-Header bar
+              // Scope / Session Sub-Header bar
               Container(
-                height: 36,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
                   color: colors.surfaceElevated,
                   border: Border(bottom: BorderSide(color: colors.divider)),
@@ -245,14 +245,17 @@ class _ChatPanelState extends State<ChatPanel> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.article_outlined,
+                      widget.chatViewModel.currentSessionId != null
+                          ? Icons.chat_bubble_outline_rounded
+                          : Icons.article_outlined,
                       size: 14,
                       color: colors.primary,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        widget.paper.title,
+                        widget.chatViewModel.currentSessionTitle ??
+                            widget.paper.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTypography.caption.copyWith(
@@ -261,7 +264,53 @@ class _ChatPanelState extends State<ChatPanel> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
+                    // Nút Cuộc trò chuyện mới
+                    Tooltip(
+                      message: strings.startNewConversation,
+                      child: InkWell(
+                        onTap: () {
+                          widget.chatViewModel.startNewSession();
+                          if (_selectedTab != 0) {
+                            setState(() => _selectedTab = 0);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(4),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: colors.primary.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.add,
+                                size: 13,
+                                color: colors.primary,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                strings.newConversation,
+                                style: AppTypography.caption.copyWith(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
@@ -274,25 +323,15 @@ class _ChatPanelState extends State<ChatPanel> {
                           color: colors.primary.withValues(alpha: 0.2),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Text(
-                            widget.chatViewModel.scope == 'selection'
-                                ? strings.selectionScope
-                                : strings.entirePaperScope,
-                            style: AppTypography.caption.copyWith(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: colors.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          Icon(
-                            Icons.arrow_drop_down,
-                            size: 12,
-                            color: colors.primary,
-                          ),
-                        ],
+                      child: Text(
+                        widget.chatViewModel.scope == 'selection'
+                            ? strings.selectionScope
+                            : strings.entirePaperScope,
+                        style: AppTypography.caption.copyWith(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: colors.primary,
+                        ),
                       ),
                     ),
                   ],
@@ -378,9 +417,40 @@ class _ChatPanelState extends State<ChatPanel> {
     );
   }
 
+  void _confirmDeleteSession(BuildContext context, String sessionId) {
+    final strings = widget.settingsVM.strings;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(strings.deleteConversation),
+        content: Text(strings.confirmDeleteConversation),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(strings.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              widget.chatViewModel.deleteSession(sessionId);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(strings.deleteConversationSuccess),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: Text(strings.delete),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHistoryContent(AppColorsExtension colors) {
     final strings = widget.settingsVM.strings;
-    final history = widget.chatViewModel.chatHistory;
+    final sessions = widget.chatViewModel.chatSessions;
+    final legacyHistory = widget.chatViewModel.chatHistory;
 
     return Column(
       children: [
@@ -389,7 +459,9 @@ class _ChatPanelState extends State<ChatPanel> {
           child: Row(
             children: [
               Text(
-                '${strings.historyTab} (${history.length})',
+                sessions.isNotEmpty
+                    ? '${strings.conversations} (${sessions.length})'
+                    : '${strings.historyTab} (${legacyHistory.length})',
                 style: AppTypography.caption.copyWith(
                   fontWeight: FontWeight.bold,
                   color: colors.textSecondary,
@@ -399,7 +471,7 @@ class _ChatPanelState extends State<ChatPanel> {
               IconButton(
                 onPressed: widget.chatViewModel.isHistoryLoading
                     ? null
-                    : widget.chatViewModel.loadChatHistory,
+                    : widget.chatViewModel.loadChatSessions,
                 tooltip: strings.historyTab,
                 icon: const Icon(Icons.refresh, size: 16),
                 visualDensity: VisualDensity.compact,
@@ -413,7 +485,7 @@ class _ChatPanelState extends State<ChatPanel> {
         ),
         Divider(height: 1, color: colors.divider),
         Expanded(
-          child: widget.chatViewModel.isHistoryLoading && history.isEmpty
+          child: widget.chatViewModel.isHistoryLoading && sessions.isEmpty && legacyHistory.isEmpty
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -429,7 +501,7 @@ class _ChatPanelState extends State<ChatPanel> {
                     ],
                   ),
                 )
-              : history.isEmpty
+              : sessions.isEmpty && legacyHistory.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -438,38 +510,188 @@ class _ChatPanelState extends State<ChatPanel> {
                       children: [
                         Icon(
                           widget.chatViewModel.historyError == null
-                              ? Icons.history_rounded
+                              ? Icons.forum_outlined
                               : Icons.error_outline,
-                          size: 30,
+                          size: 32,
                           color: colors.textSecondary,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           widget.chatViewModel.historyError == null
-                              ? strings.noChatHistory
+                              ? strings.noConversationsYet
                               : strings.chatHistoryLoadFailed,
+                          textAlign: TextAlign.center,
+                          style: AppTypography.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          strings.noConversationsHint,
                           textAlign: TextAlign.center,
                           style: AppTypography.caption.copyWith(
                             color: colors.textSecondary,
                           ),
                         ),
-                        if (widget.chatViewModel.historyError != null) ...[
-                          const SizedBox(height: 8),
-                          TextButton.icon(
-                            onPressed: widget.chatViewModel.loadChatHistory,
-                            icon: const Icon(Icons.refresh, size: 14),
-                            label: Text(strings.retry),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            widget.chatViewModel.startNewSession();
+                            setState(() => _selectedTab = 0);
+                          },
+                          icon: const Icon(Icons.add_comment_outlined, size: 14),
+                          label: Text(strings.startNewConversation),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colors.primary,
+                            foregroundColor: colors.onPrimary,
+                            textStyle: AppTypography.caption.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ],
+                        ),
                       ],
                     ),
                   ),
                 )
+              : sessions.isNotEmpty
+              ? ListView.builder(
+                  padding: const EdgeInsets.all(10),
+                  itemCount: sessions.length,
+                  itemBuilder: (context, index) {
+                    final session = sessions[index];
+                    final isActive =
+                        session.id == widget.chatViewModel.currentSessionId;
+                    final formattedTime =
+                        '${MaterialLocalizations.of(context).formatMediumDate(session.updatedAt.toLocal())} · '
+                        '${TimeOfDay.fromDateTime(session.updatedAt.toLocal()).format(context)}';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? colors.selectionBackground
+                            : colors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isActive
+                              ? colors.primary
+                              : colors.divider,
+                        ),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () async {
+                          await widget.chatViewModel.selectSession(session.id);
+                          if (mounted) {
+                            setState(() => _selectedTab = 0);
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.chat_bubble_outline_rounded,
+                                    size: 16,
+                                    color: isActive
+                                        ? colors.primary
+                                        : colors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      session.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.caption.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: colors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.delete_outline,
+                                      size: 16,
+                                      color: colors.textSecondary,
+                                    ),
+                                    tooltip: strings.deleteConversation,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 26,
+                                      minHeight: 26,
+                                    ),
+                                    onPressed: () {
+                                      _confirmDeleteSession(context, session.id);
+                                    },
+                                  ),
+                                ],
+                              ),
+                              if (session.lastQuestion != null &&
+                                  session.lastQuestion!.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  session.lastQuestion!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.caption.copyWith(
+                                    color: colors.textSecondary,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colors.surface,
+                                      borderRadius:
+                                          BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: colors.divider,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      strings.messagesCount(
+                                          session.messageCount),
+                                      style: AppTypography.caption.copyWith(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: colors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    formattedTime,
+                                    style: AppTypography.caption.copyWith(
+                                      fontSize: 10,
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                )
               : ListView.builder(
                   padding: const EdgeInsets.all(10),
-                  itemCount: history.length,
+                  itemCount: legacyHistory.length,
                   itemBuilder: (context, index) {
-                    final entry = history[index];
+                    final entry = legacyHistory[index];
                     final question = entry['question']?.toString() ?? '';
                     final answer = entry['answer']?.toString() ?? '';
                     final createdAt = DateTime.tryParse(

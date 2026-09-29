@@ -174,6 +174,18 @@ class AppStrings {
       isVi ? 'Không thể tải lịch sử chat' : 'Could not load chat history';
   String get loadingChatHistory =>
       isVi ? 'Đang tải lịch sử...' : 'Loading history...';
+  String get newConversation => isVi ? 'Cuộc trò chuyện mới' : 'New conversation';
+  String get startNewConversation => isVi ? 'Bắt đầu cuộc trò chuyện mới' : 'Start new conversation';
+  String get conversations => isVi ? 'Cuộc trò chuyện' : 'Conversations';
+  String get noConversationsYet => isVi ? 'Chưa có cuộc trò chuyện nào' : 'No conversations yet';
+  String get noConversationsHint =>
+      isVi ? 'Bắt đầu đặt câu hỏi để tạo cuộc trò chuyện đầu tiên' : 'Ask a question to start your first conversation';
+  String get deleteConversation => isVi ? 'Xóa cuộc trò chuyện' : 'Delete conversation';
+  String get confirmDeleteConversation =>
+      isVi ? 'Bạn có chắc chắn muốn xóa cuộc trò chuyện này cùng toàn bộ tin nhắn bên trong?' : 'Are you sure you want to delete this conversation and all its messages?';
+  String get deleteConversationSuccess => isVi ? 'Đã xóa cuộc trò chuyện' : 'Conversation deleted';
+  String messagesCount(int count) => isVi ? '$count câu hỏi' : '$count questions';
+  String get continueConversation => isVi ? 'Tiếp tục trò chuyện' : 'Continue conversation';
   String get userRole => isVi ? 'Bạn' : 'You';
   String get assistantRole => isVi ? 'Trợ lý' : 'Assistant';
   String get entirePaperScope => isVi ? 'Chỉ tài liệu này' : 'Entire paper';

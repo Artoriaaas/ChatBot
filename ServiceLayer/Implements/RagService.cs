@@ -28,7 +28,7 @@ namespace ServiceLayer.Implements
         }
 
         public async Task<(bool success, RagResult? result, string? errorMessage)> AskAsync(
-            string question, Guid? subjectId = null, Guid? chapterId = null, int? documentId = null, string? userId = null)
+            string question, Guid? subjectId = null, Guid? chapterId = null, int? documentId = null, string? userId = null, Guid? sessionId = null)
         {
             if (string.IsNullOrWhiteSpace(question))
                 return (false, null, "Question cannot be empty");
@@ -235,7 +235,7 @@ namespace ServiceLayer.Implements
             };
 
             // Bước 5: Lưu lịch sử hỏi đáp với câu trả lời sạch và chunks đã lọc
-            var (saveSuccess, saveError) = await _chatHistoryService.SaveAsync(
+            var (saveSuccess, actualSessionId, saveError) = await _chatHistoryService.SaveAsync(
                 question,
                 cleanAnswer,
                 filteredChunks,
@@ -246,7 +246,10 @@ namespace ServiceLayer.Implements
                 promptTokens,
                 completionTokens,
                 totalTokens,
-                modelName);
+                modelName,
+                sessionId);
+
+            result.SessionId = actualSessionId;
 
             if (!saveSuccess)
             {

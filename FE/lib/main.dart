@@ -18,23 +18,23 @@ import 'package:paper_chat/shared/widgets/app_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize repositories & API services
   final settingsRepo = SettingsRepository();
   await settingsRepo.init();
-  
+
   final notesRepo = NotesRepository();
   await notesRepo.init();
 
   final projectRepo = ProjectRepository();
   await projectRepo.init();
-  
+
   final apiService = ApiService();
   final paperRepo = ApiPaperRepository(apiService);
   await paperRepo.fetchRemotePapers();
 
   final aiService = ApiAiService(apiService);
-  
+
   // Create view models
   final authVM = AuthViewModel();
   // Xóa token cũ khi khởi động - bắt buộc đăng nhập lại mỗi phiên
@@ -42,20 +42,22 @@ void main() async {
   final settingsVM = SettingsViewModel(settingsRepo);
   final libraryVM = LibraryViewModel(paperRepo);
   final readerVM = ReaderViewModel();
-  final chatVM = ChatViewModel(aiService);
+  final chatVM = ChatViewModel(aiService, apiService);
   final notesVM = NotesViewModel(notesRepo);
   final projectsVM = ProjectsViewModel(projectRepo, paperRepo, aiService);
-  
-  runApp(PaperInkApp(
-    authVM: authVM,
-    settingsVM: settingsVM,
-    libraryVM: libraryVM,
-    readerVM: readerVM,
-    chatVM: chatVM,
-    notesVM: notesVM,
-    projectsVM: projectsVM,
-    notesRepo: notesRepo,
-  ));
+
+  runApp(
+    PaperInkApp(
+      authVM: authVM,
+      settingsVM: settingsVM,
+      libraryVM: libraryVM,
+      readerVM: readerVM,
+      chatVM: chatVM,
+      notesVM: notesVM,
+      projectsVM: projectsVM,
+      notesRepo: notesRepo,
+    ),
+  );
 }
 
 class PaperInkApp extends StatelessWidget {
@@ -67,7 +69,7 @@ class PaperInkApp extends StatelessWidget {
   final NotesViewModel notesVM;
   final ProjectsViewModel projectsVM;
   final NotesRepository notesRepo;
-  
+
   const PaperInkApp({
     super.key,
     required this.authVM,
@@ -79,7 +81,7 @@ class PaperInkApp extends StatelessWidget {
     required this.projectsVM,
     required this.notesRepo,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -104,10 +106,7 @@ class PaperInkApp extends StatelessWidget {
                   notesRepo: notesRepo,
                   authVM: authVM,
                 )
-              : AuthScreen(
-                  authVM: authVM,
-                  settingsVM: settingsVM,
-                ),
+              : AuthScreen(authVM: authVM, settingsVM: settingsVM),
         );
       },
     );

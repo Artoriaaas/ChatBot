@@ -1,3 +1,5 @@
+import 'package:paper_chat/models/document_reference.dart';
+
 class PaperPage {
   final int pageNumber;
   final String sectionTitle;
@@ -24,6 +26,7 @@ class Paper {
   bool isFavorite;
   PaperStatus status;
   final List<PaperPage> pages;
+  List<DocumentReference> references;
   String indexStatus;
   int indexProgress;
 
@@ -47,6 +50,7 @@ class Paper {
     this.isFavorite = false,
     this.status = PaperStatus.unread,
     required this.pages,
+    List<DocumentReference>? references,
     this.indexStatus = 'Completed',
     this.indexProgress = 100,
     this.journal,
@@ -56,7 +60,7 @@ class Paper {
     this.issue,
     this.pagesInfo,
     this.keywords,
-  });
+  }) : references = references ?? [];
 
   void updateMetadata({
     String? title,

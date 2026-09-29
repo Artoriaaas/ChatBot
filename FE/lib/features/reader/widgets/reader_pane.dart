@@ -4,9 +4,11 @@ import 'package:paper_chat/app/localization/app_strings.dart';
 import 'package:paper_chat/app/theme/app_colors.dart';
 import 'package:paper_chat/app/theme/app_typography.dart';
 import 'package:paper_chat/features/reader/widgets/selection_menu.dart';
+import 'package:paper_chat/models/document_reference.dart';
 import 'package:paper_chat/models/paper.dart';
 import 'package:paper_chat/shared/widgets/math_markdown_builder.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:url_launcher/url_launcher.dart';
 
 class ReaderPane extends StatefulWidget {
   final AppStrings strings;
@@ -71,7 +73,10 @@ class _ReaderPaneState extends State<ReaderPane> {
   void didUpdateWidget(ReaderPane oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncKeys();
-    if (widget.isContinuousMode && widget.currentPage != oldWidget.currentPage) {
+    if (widget.isContinuousMode &&
+        (widget.currentPage != oldWidget.currentPage ||
+            (widget.highlightedCitationText != null &&
+                widget.highlightedCitationText != oldWidget.highlightedCitationText))) {
       _scrollToSection(widget.currentPage);
     }
   }
@@ -149,6 +154,268 @@ class _ReaderPaneState extends State<ReaderPane> {
     super.dispose();
   }
 
+  void _handleLinkTap(String text, String? href, AppColorsExtension colors) {
+    if (href == null || href.isEmpty) return;
+
+    if (href.startsWith('cite:')) {
+      final refKey = href.substring(5).trim();
+      _showCitationDialog(refKey, text, colors);
+      return;
+    }
+
+    if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:')) {
+      final uri = Uri.tryParse(href);
+      if (uri != null) {
+        launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+
+    if (href.startsWith('#')) {
+      _scrollToReferencesSection();
+      return;
+    }
+  }
+
+  void _scrollToReferencesSection() {
+    int refSectionIndex = -1;
+    for (int i = 0; i < widget.paper.pages.length; i++) {
+      final t = widget.paper.pages[i].sectionTitle.toLowerCase();
+      if (t.contains('reference') || t.contains('tài liệu tham khảo')) {
+        refSectionIndex = i;
+        break;
+      }
+    }
+    if (refSectionIndex != -1) {
+      if (widget.isContinuousMode) {
+        _scrollToSection(refSectionIndex);
+      } else {
+        widget.onPageChanged(refSectionIndex);
+      }
+    }
+  }
+
+  void _showCitationDialog(String refKey, String displayText, AppColorsExtension colors) {
+    final clean = refKey.trim().toLowerCase();
+    final normalized = clean.replaceAll(RegExp(r'^[#b]+'), '');
+    final cleanDisplay = displayText.trim().replaceAll(RegExp(r'[\[\]]'), '').toLowerCase();
+    DocumentReference? ref;
+    for (final r in widget.paper.references) {
+      final refLower = r.refKey.toLowerCase();
+      final k = refLower.replaceAll(RegExp(r'^[#b]+'), '');
+      if (refLower == clean ||
+          refLower == 'b$clean' ||
+          r.label.toLowerCase() == clean ||
+          r.label.toLowerCase() == cleanDisplay ||
+          (normalized.isNotEmpty && k == normalized)) {
+        ref = r;
+        break;
+      }
+    }
+
+    final citationLabel = ref?.label ?? displayText.trim().replaceAll(RegExp(r'[\[\]]'), '');
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        final effectiveUrl = ref?.effectiveUrl ?? '';
+        return Dialog(
+          backgroundColor: colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: colors.divider),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 540),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header badge + title
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '[$citationLabel]',
+                        style: AppTypography.heading3.copyWith(
+                          color: colors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        ref?.title ?? (ref != null ? 'Tài liệu tham khảo' : 'Trích dẫn [$citationLabel]'),
+                        style: AppTypography.heading3.copyWith(
+                          color: colors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      color: colors.textSecondary,
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(height: 1, color: colors.divider),
+                const SizedBox(height: 16),
+
+                if (ref != null) ...[
+                  if (ref.authors != null && ref.authors!.isNotEmpty) ...[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.person_outline_rounded, size: 16, color: colors.textSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            ref.authors!,
+                            style: AppTypography.body.copyWith(
+                              color: colors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if ((ref.venue != null && ref.venue!.isNotEmpty) || ref.year != null) ...[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.menu_book_rounded, size: 16, color: colors.textSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            [
+                              if (ref.venue != null && ref.venue!.isNotEmpty) ref.venue!,
+                              if (ref.year != null) '(${ref.year})',
+                            ].join(' '),
+                            style: AppTypography.body.copyWith(
+                              color: colors.textSecondary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (ref.doi != null && ref.doi!.isNotEmpty) ...[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.link_rounded, size: 16, color: colors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'DOI: ${ref.doi}',
+                            style: AppTypography.caption.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (ref.rawCitationText != null && ref.rawCitationText!.isNotEmpty && ref.title == null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colors.appBackground,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: colors.divider.withValues(alpha: 0.5)),
+                      ),
+                      child: Text(
+                        ref.rawCitationText!,
+                        style: AppTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colors.appBackground,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 20, color: colors.textSecondary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Chưa có dữ liệu chi tiết cho trích dẫn này (có thể tài liệu được bóc tách bằng chế độ dự phòng iText7 hoặc bài báo cũ).',
+                            style: AppTypography.caption.copyWith(
+                              color: colors.textSecondary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                const SizedBox(height: 8),
+
+                // Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        _scrollToReferencesSection();
+                      },
+                      icon: const Icon(Icons.library_books_outlined, size: 16),
+                      label: const Text('Xem trong bài báo'),
+                    ),
+                    if (effectiveUrl.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: () {
+                          final uri = Uri.tryParse(effectiveUrl);
+                          if (uri != null) {
+                            launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                        label: const Text('Mở liên kết'),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   MarkdownStyleSheet _buildMarkdownStyleSheet(AppColorsExtension colors, double baseFontSize) {
     return MarkdownStyleSheet(
       p: AppTypography.body.copyWith(
@@ -206,7 +473,23 @@ class _ReaderPaneState extends State<ReaderPane> {
         color: colors.divider,
         width: 1,
       ),
-      tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      strong: AppTypography.body.copyWith(
+        fontSize: baseFontSize,
+        fontWeight: FontWeight.bold,
+        color: colors.textPrimary,
+      ),
+      em: AppTypography.body.copyWith(
+        fontSize: baseFontSize,
+        fontStyle: FontStyle.italic,
+        color: colors.textPrimary,
+      ),
+      a: AppTypography.body.copyWith(
+        fontSize: baseFontSize,
+        color: colors.primary,
+        decoration: TextDecoration.underline,
+        decorationColor: colors.primary.withValues(alpha: 0.5),
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 
@@ -233,6 +516,9 @@ class _ReaderPaneState extends State<ReaderPane> {
         'math-block': MathBlockBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary)),
       },
       styleSheet: styleSheet,
+      onTapLink: (text, href, title) {
+        _handleLinkTap(text, href, colors);
+      },
     );
 
     if (widget.highlightedCitationText != null &&

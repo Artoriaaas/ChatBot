@@ -10,18 +10,20 @@ class ApiService {
 
   ApiService({http.Client? client}) : _client = client ?? http.Client();
 
-  Future<Map<String, String>> _getHeaders([Map<String, String>? extraHeaders]) async {
+  Future<Map<String, String>> _getHeaders([
+    Map<String, String>? extraHeaders,
+  ]) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('jwt_token');
-    
+
     final headers = <String, String>{
       if (token != null) 'Authorization': 'Bearer $token',
     };
-    
+
     if (extraHeaders != null) {
       headers.addAll(extraHeaders);
     }
-    
+
     return headers;
   }
 
@@ -131,7 +133,10 @@ class ApiService {
   }
 
   /// Cập nhật thông tin/metadata bài báo
-  Future<Map<String, dynamic>> updatePaper(int id, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updatePaper(
+    int id,
+    Map<String, dynamic> data,
+  ) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/paper/$id');
     final response = await _client.put(
       url,
@@ -194,6 +199,36 @@ class ApiService {
       return jsonList.cast<Map<String, dynamic>>();
     }
     throw Exception('Lỗi lấy nội dung tài liệu: ${response.body}');
+  }
+
+  /// Lấy danh sách tài liệu tham khảo (References / Citations) của Document
+  Future<List<Map<String, dynamic>>> getDocumentReferences(
+    int documentId,
+  ) async {
+    try {
+      final url = Uri.parse(
+        '${ApiConfig.baseUrl}/document/$documentId/references',
+      );
+      final response = await _client.get(url, headers: await _getHeaders());
+      if (response.statusCode == 200) {
+        final jsonList = jsonDecode(response.body) as List<dynamic>;
+        return jsonList.cast<Map<String, dynamic>>();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Lấy danh sách tài liệu tham khảo (References / Citations) của Paper
+  Future<List<Map<String, dynamic>>> getPaperReferences(int paperId) async {
+    try {
+      final url = Uri.parse('${ApiConfig.baseUrl}/paper/$paperId/references');
+      final response = await _client.get(url, headers: await _getHeaders());
+      if (response.statusCode == 200) {
+        final jsonList = jsonDecode(response.body) as List<dynamic>;
+        return jsonList.cast<Map<String, dynamic>>();
+      }
+    } catch (_) {}
+    return [];
   }
 
   /// Tải file tài liệu lên Backend
@@ -281,9 +316,11 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getHistory({
     String? userId,
     int take = 20,
+    int? documentId,
   }) async {
     final queryParams = <String, String>{
       if (userId != null) 'userId': userId,
+      if (documentId != null) 'documentId': documentId.toString(),
       'take': take.toString(),
     };
 

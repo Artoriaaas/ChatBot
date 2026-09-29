@@ -19,6 +19,8 @@ namespace BusinessObject.Entities
 
         public string? UserId { get; set; }
 
+        public int? DocumentId { get; set; }
+
         public int PromptTokens { get; set; }
 
         public int CompletionTokens { get; set; }

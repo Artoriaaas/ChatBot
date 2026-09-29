@@ -212,11 +212,22 @@ namespace ServiceLayer.Implements
                     .ToList();
             }
 
+            var citedChunks = chunks.Select((c, idx) => new BusinessObject.Dtos.RagChunkDto
+            {
+                SourceIndex = idx + 1,
+                Id = c.Id,
+                DocumentId = c.DocumentId,
+                ChunkOrder = c.ChunkOrder,
+                Content = c.Content,
+                FileName = c.Document?.FileName
+            }).ToList();
+
             var result = new RagResult
             {
                 Answer = cleanAnswer,
                 Sources = sources,
                 RetrievedChunks = filteredChunks,
+                CitedChunks = citedChunks,
                 PromptTokens = promptTokens,
                 CompletionTokens = completionTokens,
                 TotalTokens = totalTokens,
@@ -228,6 +239,7 @@ namespace ServiceLayer.Implements
                 question,
                 cleanAnswer,
                 filteredChunks,
+                documentId,
                 subjectId,
                 chapterId,
                 userId,

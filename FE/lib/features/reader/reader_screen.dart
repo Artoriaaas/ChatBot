@@ -70,7 +70,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _ensureChunksLoaded() async {
-    if (widget.paper.documentId != null && widget.paper.pages.length <= 1) {
+    if (widget.paper.documentId != null && (widget.paper.pages.length <= 1 || widget.paper.references.isEmpty)) {
       try {
         final repo = ApiPaperRepository(ApiService());
         await repo.refreshPaperIndexing(widget.paper);
@@ -368,6 +368,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         return OriginalPdfViewer(
           paper: widget.paper,
           strings: widget.settingsViewModel.strings,
+          targetPage: widget.readerViewModel.currentPage,
         );
       case ReaderViewMode.split:
         return Row(
@@ -377,6 +378,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               child: OriginalPdfViewer(
                 paper: widget.paper,
                 strings: widget.settingsViewModel.strings,
+                targetPage: widget.readerViewModel.currentPage,
               ),
             ),
             const VerticalDivider(width: 1),

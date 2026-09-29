@@ -52,15 +52,41 @@ class ApiAiService implements AiService {
 
       final answerText = (result['answer'] as String?) ?? 'Không có câu trả lời.';
       final rawSources = (result['sources'] as List<dynamic>?)?.cast<String>() ?? [];
+      final rawChunks = (result['retrievedChunks'] as List<dynamic>?) ?? [];
       
-      final citations = rawSources.map((src) {
-        return Citation(
-          paperId: paperId,
-          page: 1,
-          excerpt: src,
-          label: '[$src]',
-        );
-      }).toList();
+      final citations = <Citation>[];
+      if (rawChunks.isNotEmpty) {
+        for (int i = 0; i < rawChunks.length; i++) {
+          final c = rawChunks[i] is Map<String, dynamic>
+              ? rawChunks[i] as Map<String, dynamic>
+              : Map<String, dynamic>.from(rawChunks[i] as Map);
+          final sourceIdx = (c['sourceIndex'] as int?) ?? (i + 1);
+          final content = (c['content'] as String?) ?? '';
+          final fileName = c['fileName'] as String?;
+          final chunkOrder = c['chunkOrder'] as int?;
+
+          final page = _findPageForExcerpt(content, pages);
+          citations.add(Citation(
+            paperId: paperId,
+            page: page,
+            excerpt: content,
+            label: '[$sourceIdx]',
+            sourceIndex: sourceIdx,
+            fileName: fileName,
+            chunkOrder: chunkOrder,
+          ));
+        }
+      } else {
+        citations.addAll(rawSources.map((src) {
+          return Citation(
+            paperId: paperId,
+            page: 0,
+            excerpt: src,
+            label: '[$src]',
+            fileName: src,
+          );
+        }));
+      }
 
       // Giả lập hiệu ứng gõ chữ (typing effect) từ câu trả lời của BE
       final words = answerText.split(' ');
@@ -112,5 +138,57 @@ class ApiAiService implements AiService {
         },
       );
     }
+  }
+
+  int _findPageForExcerpt(String excerpt, List<PaperPage> pages) {
+    if (pages.isEmpty || excerpt.trim().isEmpty) return 0;
+
+    final cleanExcerpt = excerpt.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+    
+    // Thử tìm đoạn 50-80 ký tự đầu tiên
+    final testSnippet = cleanExcerpt.length > 60 
+        ? cleanExcerpt.substring(0, 60) 
+        : cleanExcerpt;
+
+    for (int i = 0; i < pages.length; i++) {
+      final pageContent = pages[i].content.replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+      if (pageContent.contains(testSnippet)) {
+        return i;
+      }
+    }
+
+    // Thử tìm đoạn giữa
+    if (cleanExcerpt.length > 90) {
+      final midSnippet = cleanExcerpt.substring(30, 90);
+      for (int i = 0; i < pages.length; i++) {
+        final pageContent = pages[i].content.replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+        if (pageContent.contains(midSnippet)) {
+          return i;
+        }
+      }
+    }
+
+    // Fallback: đếm số từ khớp nhiều nhất
+    final words = cleanExcerpt.split(' ').where((w) => w.length > 4).take(10).toList();
+    if (words.isNotEmpty) {
+      int bestPage = 0;
+      int maxMatches = 0;
+      for (int i = 0; i < pages.length; i++) {
+        final pageContent = pages[i].content.toLowerCase();
+        int matches = 0;
+        for (final w in words) {
+          if (pageContent.contains(w)) matches++;
+        }
+        if (matches > maxMatches) {
+          maxMatches = matches;
+          bestPage = i;
+        }
+      }
+      if (maxMatches >= 2) {
+        return bestPage;
+      }
+    }
+
+    return 0;
   }
 }

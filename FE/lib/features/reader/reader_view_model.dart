@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:paper_chat/models/document_reference.dart';
 import 'package:paper_chat/models/paper.dart';
 
 class ReaderViewModel extends ChangeNotifier {
@@ -30,6 +31,24 @@ class ReaderViewModel extends ChangeNotifier {
   Set<String> get currentHighlights => _currentPaper != null ? _highlights[_currentPaper!.id] ?? {} : {};
   int? get highlightedCitationPage => _highlightedCitationPage;
   String? get highlightedCitationText => _highlightedCitationText;
+  List<DocumentReference> get references => _currentPaper?.references ?? const [];
+
+  DocumentReference? findReference(String refKey) {
+    if (_currentPaper == null) return null;
+    final clean = refKey.trim().toLowerCase();
+    final normalized = clean.replaceAll(RegExp(r'^[#b]+'), '');
+    for (final ref in _currentPaper!.references) {
+      final refLower = ref.refKey.toLowerCase();
+      final k = refLower.replaceAll(RegExp(r'^[#b]+'), '');
+      if (refLower == clean ||
+          refLower == 'b$clean' ||
+          ref.label.toLowerCase() == clean ||
+          (normalized.isNotEmpty && k == normalized)) {
+        return ref;
+      }
+    }
+    return null;
+  }
 
   void toggleContinuousMode() {
     _isContinuousMode = !_isContinuousMode;

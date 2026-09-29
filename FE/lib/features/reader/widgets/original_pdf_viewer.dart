@@ -15,12 +15,14 @@ import 'package:paper_chat/services/api_service.dart';
 class OriginalPdfViewer extends StatefulWidget {
   final Paper paper;
   final AppStrings strings;
+  final int? targetPage;
   final VoidCallback? onDownload;
 
   const OriginalPdfViewer({
     super.key,
     required this.paper,
     required this.strings,
+    this.targetPage,
     this.onDownload,
   });
 
@@ -50,6 +52,12 @@ class _OriginalPdfViewerState extends State<OriginalPdfViewer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.paper.id != widget.paper.id) {
       _loadFile();
+    }
+    if (widget.targetPage != null && widget.targetPage != oldWidget.targetPage) {
+      final pageToJump = widget.targetPage! + 1;
+      if (pageToJump >= 1 && pageToJump <= _pageCount) {
+        _pdfController.goToPage(pageNumber: pageToJump);
+      }
     }
   }
 
@@ -373,6 +381,15 @@ class _OriginalPdfViewerState extends State<OriginalPdfViewer> {
             controller: _pdfController,
             params: PdfViewerParams(
               backgroundColor: colors.appBackground,
+              linkHandlerParams: PdfLinkHandlerParams(
+                onLinkTap: (link) {
+                  if (link.url != null) {
+                    launchUrl(link.url!, mode: LaunchMode.externalApplication);
+                  } else if (link.dest != null) {
+                    _pdfController.goToPage(pageNumber: link.dest!.pageNumber);
+                  }
+                },
+              ),
               onPageChanged: (page) {
                 if (mounted && page != null) {
                   setState(() => _currentPage = page);

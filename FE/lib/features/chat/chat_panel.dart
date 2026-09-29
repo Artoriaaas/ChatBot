@@ -18,7 +18,12 @@ class ChatPanel extends StatefulWidget {
   final ReaderViewModel readerViewModel;
   final NotesRepository notesRepository;
   final Paper paper;
-  final void Function({Note? note, String? initialTitle, String? initialContent})? onOpenNoteEditor;
+  final void Function({
+    Note? note,
+    String? initialTitle,
+    String? initialContent,
+  })?
+  onOpenNoteEditor;
 
   const ChatPanel({
     super.key,
@@ -37,7 +42,7 @@ class ChatPanel extends StatefulWidget {
 class _ChatPanelState extends State<ChatPanel> {
   final ScrollController _scrollController = ScrollController();
   bool _userScrolledUp = false;
-  int _selectedTab = 0; // 0=Chat, 1=Ghi chú
+  int _selectedTab = 0; // 0=Chat, 1=History, 2=Notes
 
   @override
   void initState() {
@@ -47,7 +52,8 @@ class _ChatPanelState extends State<ChatPanel> {
 
   void _scrollListener() {
     if (_scrollController.hasClients) {
-      final isAtBottom = _scrollController.position.pixels >= 
+      final isAtBottom =
+          _scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 50;
       setState(() {
         _userScrolledUp = !isAtBottom;
@@ -71,14 +77,18 @@ class _ChatPanelState extends State<ChatPanel> {
       paperId: widget.paper.id,
       paperTitle: widget.paper.title,
       page: widget.readerViewModel.currentPage,
-      sectionTitle: widget.readerViewModel.currentPageContent?.sectionTitle ?? 'General',
+      sectionTitle:
+          widget.readerViewModel.currentPageContent?.sectionTitle ?? 'General',
       content: content,
       createdAt: DateTime.now(),
     );
     widget.notesRepository.addNote(note);
     setState(() {}); // refresh notes tab
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(widget.settingsVM.strings.savedToNotes), duration: const Duration(seconds: 2)),
+      SnackBar(
+        content: Text(widget.settingsVM.strings.savedToNotes),
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
@@ -95,7 +105,9 @@ class _ChatPanelState extends State<ChatPanel> {
       context: context,
       builder: (context) => NoteEditorDialog(
         strings: widget.settingsVM.strings,
-        initialTitle: existingNote?.sectionTitle ?? widget.settingsVM.strings.newNoteTitle,
+        initialTitle:
+            existingNote?.sectionTitle ??
+            widget.settingsVM.strings.newNoteTitle,
         initialContent: existingNote?.content ?? '',
         isEditing: existingNote != null,
         onDelete: existingNote != null
@@ -186,9 +198,15 @@ class _ChatPanelState extends State<ChatPanel> {
                     ),
                     const SizedBox(width: 24),
                     _TabHeaderButton(
-                      label: strings.notesTab,
+                      label: strings.historyTab,
                       isSelected: _selectedTab == 1,
                       onTap: () => setState(() => _selectedTab = 1),
+                    ),
+                    const SizedBox(width: 16),
+                    _TabHeaderButton(
+                      label: strings.notesTab,
+                      isSelected: _selectedTab == 2,
+                      onTap: () => setState(() => _selectedTab = 2),
                     ),
                   ],
                 ),
@@ -204,7 +222,11 @@ class _ChatPanelState extends State<ChatPanel> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.article_outlined, size: 14, color: colors.primary),
+                    Icon(
+                      Icons.article_outlined,
+                      size: 14,
+                      color: colors.primary,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -219,16 +241,23 @@ class _ChatPanelState extends State<ChatPanel> {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: colors.selectionBackground,
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: colors.primary.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: colors.primary.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         children: [
                           Text(
-                            widget.chatViewModel.scope == 'selection' ? strings.selectionScope : strings.entirePaperScope,
+                            widget.chatViewModel.scope == 'selection'
+                                ? strings.selectionScope
+                                : strings.entirePaperScope,
                             style: AppTypography.caption.copyWith(
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
@@ -236,7 +265,11 @@ class _ChatPanelState extends State<ChatPanel> {
                             ),
                           ),
                           const SizedBox(width: 2),
-                          Icon(Icons.arrow_drop_down, size: 12, color: colors.primary),
+                          Icon(
+                            Icons.arrow_drop_down,
+                            size: 12,
+                            color: colors.primary,
+                          ),
                         ],
                       ),
                     ),
@@ -248,6 +281,8 @@ class _ChatPanelState extends State<ChatPanel> {
               Expanded(
                 child: _selectedTab == 0
                     ? _buildChatContent(messages, colors)
+                    : _selectedTab == 1
+                    ? _buildHistoryContent(colors)
                     : _buildNotesContent(colors),
               ),
             ],
@@ -294,7 +329,10 @@ class _ChatPanelState extends State<ChatPanel> {
                   child: Center(
                     child: FloatingActionButton.extended(
                       onPressed: _scrollToBottom,
-                      label: Text(strings.newMessages, style: const TextStyle(fontSize: 12)),
+                      label: Text(
+                        strings.newMessages,
+                        style: const TextStyle(fontSize: 12),
+                      ),
                       icon: const Icon(Icons.arrow_downward, size: 14),
                       backgroundColor: colors.surfaceElevated,
                       foregroundColor: colors.textPrimary,
@@ -313,6 +351,168 @@ class _ChatPanelState extends State<ChatPanel> {
           onSend: widget.chatViewModel.sendMessage,
           isStreaming: widget.chatViewModel.isStreaming,
           onStop: widget.chatViewModel.stopStreaming,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHistoryContent(AppColorsExtension colors) {
+    final strings = widget.settingsVM.strings;
+    final history = widget.chatViewModel.chatHistory;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              Text(
+                '${strings.historyTab} (${history.length})',
+                style: AppTypography.caption.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: widget.chatViewModel.isHistoryLoading
+                    ? null
+                    : widget.chatViewModel.loadChatHistory,
+                tooltip: strings.historyTab,
+                icon: const Icon(Icons.refresh, size: 16),
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 30,
+                  height: 30,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: colors.divider),
+        Expanded(
+          child: widget.chatViewModel.isHistoryLoading && history.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 10),
+                      Text(
+                        strings.loadingChatHistory,
+                        style: AppTypography.caption.copyWith(
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : history.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          widget.chatViewModel.historyError == null
+                              ? Icons.history_rounded
+                              : Icons.error_outline,
+                          size: 30,
+                          color: colors.textSecondary,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.chatViewModel.historyError == null
+                              ? strings.noChatHistory
+                              : strings.chatHistoryLoadFailed,
+                          textAlign: TextAlign.center,
+                          style: AppTypography.caption.copyWith(
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                        if (widget.chatViewModel.historyError != null) ...[
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: widget.chatViewModel.loadChatHistory,
+                            icon: const Icon(Icons.refresh, size: 14),
+                            label: Text(strings.retry),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(10),
+                  itemCount: history.length,
+                  itemBuilder: (context, index) {
+                    final entry = history[index];
+                    final question = entry['question']?.toString() ?? '';
+                    final answer = entry['answer']?.toString() ?? '';
+                    final createdAt = DateTime.tryParse(
+                      entry['createdAt']?.toString() ?? '',
+                    )?.toLocal();
+                    final timestamp = createdAt == null
+                        ? null
+                        : '${MaterialLocalizations.of(context).formatMediumDate(createdAt)} · '
+                              '${TimeOfDay.fromDateTime(createdAt).format(context)}';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: colors.divider),
+                      ),
+                      child: ExpansionTile(
+                        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                        childrenPadding: const EdgeInsets.fromLTRB(
+                          12,
+                          0,
+                          12,
+                          12,
+                        ),
+                        leading: Icon(
+                          Icons.chat_bubble_outline,
+                          size: 17,
+                          color: colors.primary,
+                        ),
+                        title: Text(
+                          question,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.caption.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        subtitle: timestamp == null
+                            ? null
+                            : Text(
+                                timestamp,
+                                style: AppTypography.caption.copyWith(
+                                  fontSize: 10,
+                                  color: colors.textSecondary,
+                                ),
+                              ),
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: SelectableText(
+                              answer,
+                              style: AppTypography.body.copyWith(
+                                fontSize: 12,
+                                height: 1.45,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -339,10 +539,18 @@ class _ChatPanelState extends State<ChatPanel> {
               ElevatedButton.icon(
                 onPressed: () => _openNoteEditor(),
                 icon: const Icon(Icons.add, size: 14),
-                label: Text(strings.createNote, style: AppTypography.caption.copyWith(color: colors.onPrimary)),
+                label: Text(
+                  strings.createNote,
+                  style: AppTypography.caption.copyWith(
+                    color: colors.onPrimary,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -357,11 +565,17 @@ class _ChatPanelState extends State<ChatPanel> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.description_outlined, size: 36, color: colors.textSecondary.withValues(alpha: 0.5)),
+                      Icon(
+                        Icons.description_outlined,
+                        size: 36,
+                        color: colors.textSecondary.withValues(alpha: 0.5),
+                      ),
                       const SizedBox(height: 8),
                       Text(
                         strings.noNotesYet,
-                        style: AppTypography.body.copyWith(color: colors.textSecondary),
+                        style: AppTypography.body.copyWith(
+                          color: colors.textSecondary,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Padding(
@@ -369,7 +583,9 @@ class _ChatPanelState extends State<ChatPanel> {
                         child: Text(
                           strings.noNotesHint,
                           textAlign: TextAlign.center,
-                          style: AppTypography.caption.copyWith(color: colors.textSecondary.withValues(alpha: 0.7)),
+                          style: AppTypography.caption.copyWith(
+                            color: colors.textSecondary.withValues(alpha: 0.7),
+                          ),
                         ),
                       ),
                     ],
@@ -399,7 +615,10 @@ class _ChatPanelState extends State<ChatPanel> {
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: colors.selectionBackground,
                                     borderRadius: BorderRadius.circular(4),
@@ -425,20 +644,34 @@ class _ChatPanelState extends State<ChatPanel> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.edit_outlined, size: 14, color: colors.textSecondary),
+                                  icon: Icon(
+                                    Icons.edit_outlined,
+                                    size: 14,
+                                    color: colors.textSecondary,
+                                  ),
                                   onPressed: () => _openNoteEditor(note),
                                   padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 24,
+                                    minHeight: 24,
+                                  ),
                                   tooltip: strings.editNote,
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.delete_outline, size: 14, color: colors.textSecondary),
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    size: 14,
+                                    color: colors.textSecondary,
+                                  ),
                                   onPressed: () {
                                     widget.notesRepository.deleteNote(note.id);
                                     setState(() {});
                                   },
                                   padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 24,
+                                    minHeight: 24,
+                                  ),
                                   tooltip: strings.deleteNote,
                                 ),
                               ],

@@ -535,12 +535,53 @@ namespace ServiceLayer.Implements
                         }
                     }
 
+                    // 5.3 Trích xuất danh sách tài liệu tham khảo (References / Bibliography)
+                    var references = ExtractReferencesFromTei(doc, ns);
+                    result.References = references;
+
+                    if (references.Count > 0)
+                    {
+                        var hasExistingRefSection = sections.Any(s => s.Title.Contains("Reference", StringComparison.OrdinalIgnoreCase) || s.Title.Contains("Tài liệu tham khảo", StringComparison.OrdinalIgnoreCase));
+                        if (!hasExistingRefSection)
+                        {
+                            var refSb = new StringBuilder();
+                            foreach (var r in references)
+                            {
+                                var lineSb = new StringBuilder();
+                                lineSb.Append($"<a id=\"ref-{r.RefKey}\"></a>**[{r.Label}]** ");
+                                if (!string.IsNullOrWhiteSpace(r.Authors)) lineSb.Append($"{r.Authors}. ");
+                                if (r.Year.HasValue) lineSb.Append($"({r.Year.Value}). ");
+                                if (!string.IsNullOrWhiteSpace(r.Title)) lineSb.Append($"*{r.Title}*. ");
+                                if (!string.IsNullOrWhiteSpace(r.Venue)) lineSb.Append($"{r.Venue}. ");
+                                if (!string.IsNullOrWhiteSpace(r.Doi)) lineSb.Append($"https://doi.org/{r.Doi}");
+                                else if (!string.IsNullOrWhiteSpace(r.Url)) lineSb.Append($"{r.Url}");
+                                else if (!string.IsNullOrWhiteSpace(r.RawCitationText) && string.IsNullOrWhiteSpace(r.Title)) lineSb.Append(r.RawCitationText);
+
+                                refSb.AppendLine(lineSb.ToString().Trim());
+                                refSb.AppendLine();
+                            }
+
+                            sections.Add(new DocumentSectionDto
+                            {
+                                SectionOrder = sectionOrder++,
+                                Title = "References",
+                                Content = refSb.ToString().Trim()
+                            });
+                        }
+                    }
+
                     // Loại bỏ section rỗng và gán lại số thứ tự SectionOrder
                     sections = sections.Where(s => !string.IsNullOrWhiteSpace(s.Content) || !string.IsNullOrWhiteSpace(s.Title)).ToList();
                     for (int i = 0; i < sections.Count; i++)
                     {
                         sections[i].SectionOrder = i;
                     }
+                }
+                else
+                {
+                    // Nếu không có body div, vẫn kiểm tra trích xuất references từ tei
+                    var references = ExtractReferencesFromTei(doc, ns);
+                    result.References = references;
                 }
 
                 result.Sections = sections;
@@ -868,7 +909,7 @@ namespace ServiceLayer.Implements
             return match.Success ? match.Groups[1].Value : string.Empty;
         }
 
-        private static string CleanWhitespace(string input)
+        private static string CleanWhitespace(string? input)
         {
             if (string.IsNullOrWhiteSpace(input)) return string.Empty;
             return Regex.Replace(input.Trim(), @"[ \t]+", " ");
@@ -924,8 +965,24 @@ namespace ServiceLayer.Implements
                     }
                     else if (localName == "ref")
                     {
+                        var type = (string?)el.Attribute("type");
+                        var target = (string?)el.Attribute("target");
                         var innerText = ExtractFormattedText(el);
-                        sb.Append(innerText);
+
+                        if (type == "bibr" && !string.IsNullOrEmpty(target))
+                        {
+                            var refKey = target.TrimStart('#');
+                            var cleanLabel = innerText.Trim().Trim('[', ']');
+                            if (string.IsNullOrWhiteSpace(cleanLabel))
+                            {
+                                cleanLabel = innerText.Trim();
+                            }
+                            sb.Append($"[\\[{cleanLabel}\\]](cite:{refKey})");
+                        }
+                        else
+                        {
+                            sb.Append(innerText);
+                        }
                     }
                     else
                     {
@@ -934,6 +991,140 @@ namespace ServiceLayer.Implements
                 }
             }
             return CleanWhitespace(sb.ToString());
+        }
+
+        private static List<DocumentReferenceDto> ExtractReferencesFromTei(XDocument doc, XNamespace ns)
+        {
+            var list = new List<DocumentReferenceDto>();
+            var biblNodes = doc.Descendants(ns + "biblStruct").ToList();
+            int index = 1;
+
+            foreach (var bibl in biblNodes)
+            {
+                var rawId = (string?)bibl.Attribute(XNamespace.Xml + "id") 
+                            ?? (string?)bibl.Attribute("id") 
+                            ?? $"b{index - 1}";
+                var refKey = rawId.TrimStart('#');
+
+                // Label
+                var labelNode = bibl.Element(ns + "label");
+                string label;
+                if (!string.IsNullOrWhiteSpace(labelNode?.Value))
+                {
+                    label = CleanWhitespace(labelNode.Value).Trim('[', ']', ' ', '.');
+                }
+                else
+                {
+                    var match = Regex.Match(refKey, @"b(\d+)", RegexOptions.IgnoreCase);
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out int num))
+                    {
+                        label = (num + 1).ToString();
+                    }
+                    else
+                    {
+                        label = index.ToString();
+                    }
+                }
+
+                // Title
+                var title = bibl.Element(ns + "analytic")?.Elements(ns + "title").FirstOrDefault()?.Value
+                            ?? bibl.Element(ns + "monogr")?.Elements(ns + "title").FirstOrDefault()?.Value;
+                title = CleanWhitespace(title);
+
+                // Authors
+                var authorNames = new List<string>();
+                var analyticAuthors = bibl.Element(ns + "analytic")?.Elements(ns + "author") ?? Enumerable.Empty<XElement>();
+                var monogrAuthors = bibl.Element(ns + "monogr")?.Elements(ns + "author") ?? Enumerable.Empty<XElement>();
+                var authorNodes = analyticAuthors.Concat(monogrAuthors);
+
+                foreach (var author in authorNodes)
+                {
+                    var persName = author.Element(ns + "persName");
+                    if (persName != null)
+                    {
+                        var forenames = persName.Elements(ns + "forename").Select(f => f.Value.Trim());
+                        var surname = persName.Element(ns + "surname")?.Value?.Trim();
+                        var full = string.Join(" ", forenames.Concat(string.IsNullOrEmpty(surname) ? Array.Empty<string>() : new[] { surname })).Trim();
+                        if (!string.IsNullOrWhiteSpace(full) && !authorNames.Contains(full))
+                        {
+                            authorNames.Add(full);
+                        }
+                    }
+                    else
+                    {
+                        var org = author.Element(ns + "orgName")?.Value?.Trim() ?? author.Value?.Trim();
+                        if (!string.IsNullOrWhiteSpace(org) && !authorNames.Contains(org))
+                        {
+                            authorNames.Add(org);
+                        }
+                    }
+                }
+                var authors = authorNames.Count > 0 ? string.Join(", ", authorNames) : null;
+
+                // Year
+                int? year = null;
+                var dateNode = bibl.Descendants(ns + "date").FirstOrDefault();
+                if (dateNode != null)
+                {
+                    var whenAttr = (string?)dateNode.Attribute("when");
+                    if (!string.IsNullOrEmpty(whenAttr) && Regex.Match(whenAttr, @"\b(19\d{2}|20\d{2})\b") is { Success: true } m)
+                    {
+                        if (int.TryParse(m.Value, out int yr)) year = yr;
+                    }
+                    else if (Regex.Match(dateNode.Value, @"\b(19\d{2}|20\d{2})\b") is { Success: true } tm)
+                    {
+                        if (int.TryParse(tm.Value, out int yr)) year = yr;
+                    }
+                }
+
+                // Venue
+                string? venue = null;
+                if (bibl.Element(ns + "analytic") != null)
+                {
+                    venue = bibl.Element(ns + "monogr")?.Elements(ns + "title").FirstOrDefault()?.Value;
+                }
+                venue = CleanWhitespace(venue);
+
+                // DOI & URL
+                var doiNode = bibl.Descendants(ns + "idno")
+                    .FirstOrDefault(n => string.Equals((string?)n.Attribute("type"), "DOI", StringComparison.OrdinalIgnoreCase));
+                string? doi = CleanWhitespace(doiNode?.Value);
+
+                var ptrNode = bibl.Descendants(ns + "ptr").FirstOrDefault();
+                string? url = (string?)ptrNode?.Attribute("target");
+
+                var rawNote = bibl.Elements(ns + "note")
+                    .FirstOrDefault(n => (string?)n.Attribute("type") == "raw_reference")?.Value;
+                string? rawCitation = CleanWhitespace(rawNote);
+
+                if (string.IsNullOrEmpty(doi) && !string.IsNullOrEmpty(rawCitation))
+                {
+                    var doiMatch = Regex.Match(rawCitation, @"\b(10\.\d{4,9}/[-._;()/:A-Za-z0-9]+)\b");
+                    if (doiMatch.Success) doi = doiMatch.Groups[1].Value.TrimEnd('.', ',');
+                }
+
+                if (string.IsNullOrEmpty(url) && !string.IsNullOrEmpty(doi))
+                {
+                    url = $"https://doi.org/{doi}";
+                }
+
+                list.Add(new DocumentReferenceDto
+                {
+                    RefKey = refKey,
+                    Label = label,
+                    Title = string.IsNullOrWhiteSpace(title) ? null : title,
+                    Authors = string.IsNullOrWhiteSpace(authors) ? null : authors,
+                    Year = year,
+                    Venue = string.IsNullOrWhiteSpace(venue) ? null : venue,
+                    Doi = string.IsNullOrWhiteSpace(doi) ? null : doi,
+                    Url = string.IsNullOrWhiteSpace(url) ? null : url,
+                    RawCitationText = string.IsNullOrWhiteSpace(rawCitation) ? null : rawCitation
+                });
+
+                index++;
+            }
+
+            return list;
         }
     }
 }

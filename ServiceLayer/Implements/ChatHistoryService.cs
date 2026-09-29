@@ -22,6 +22,7 @@ namespace ServiceLayer.Implements
             string question,
             string answer,
             List<DocumentChunk> retrievedChunks,
+            int? documentId,
             Guid? subjectId,
             Guid? chapterId,
             string? userId,
@@ -37,6 +38,7 @@ namespace ServiceLayer.Implements
                     Question = question,
                     Answer = answer,
                     UserId = userId,
+                    DocumentId = documentId,
                     CreatedAt = DateTime.UtcNow,
 
                     PromptTokens = promptTokens,
@@ -67,7 +69,8 @@ namespace ServiceLayer.Implements
             string? userId,
             Guid? subjectId = null,
             Guid? chapterId = null,
-            int take = 20)
+            int take = 20,
+            int? documentId = null)
         {
             try
             {
@@ -82,7 +85,10 @@ namespace ServiceLayer.Implements
                     query = query.Where(ch => ch.UserId == userId);
                 }
 
-
+                if (documentId.HasValue)
+                {
+                    query = query.Where(ch => ch.DocumentId == documentId.Value);
+                }
 
                 var results = await query
                     .OrderByDescending(ch => ch.CreatedAt)

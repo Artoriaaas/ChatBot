@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using ServiceLayer.Interfaces;
 using BusinessObject.Entities;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace ChatBot.Controllers
@@ -58,14 +59,25 @@ namespace ChatBot.Controllers
                     completionTokens = result.CompletionTokens,
                     totalTokens = result.TotalTokens,
                     modelName = result.ModelName,
-                    retrievedChunks = result.RetrievedChunks?.Select(c => new
-                    {
-                        id = c.Id,
-                        documentId = c.DocumentId,
-                        chunkOrder = c.ChunkOrder,
-                        content = c.Content,
-                        fileName = c.Document?.FileName
-                    })
+                    retrievedChunks = (result.CitedChunks?.Any() == true
+                        ? result.CitedChunks.Select(c => new
+                        {
+                            sourceIndex = c.SourceIndex,
+                            id = c.Id,
+                            documentId = c.DocumentId,
+                            chunkOrder = c.ChunkOrder,
+                            content = c.Content,
+                            fileName = c.FileName
+                        })
+                        : result.RetrievedChunks?.Select((c, idx) => new
+                        {
+                            sourceIndex = idx + 1,
+                            id = c.Id,
+                            documentId = c.DocumentId,
+                            chunkOrder = c.ChunkOrder,
+                            content = c.Content,
+                            fileName = c.Document?.FileName
+                        }))
                 });
             }
             catch (Exception ex)
@@ -79,17 +91,26 @@ namespace ChatBot.Controllers
             [FromQuery] string? userId = null,
             [FromQuery] Guid? subjectId = null,
             [FromQuery] Guid? chapterId = null,
-            [FromQuery] int take = 20)
+            [FromQuery] int take = 20,
+            [FromQuery] int? documentId = null)
         {
             try
             {
-                var (success, history, errorMessage) = await _chatHistoryService.GetHistoryAsync(userId, subjectId, chapterId, take);
+                var (success, history, errorMessage) = await _chatHistoryService.GetHistoryAsync(
+                    userId, subjectId, chapterId, take, documentId);
                 if (!success)
                 {
                     return BadRequest(new { message = errorMessage ?? "Failed to fetch history." });
                 }
 
-                return Ok(history);
+                return Ok(history?.Select(item => new
+                {
+                    item.Id,
+                    item.DocumentId,
+                    item.Question,
+                    item.Answer,
+                    item.CreatedAt
+                }));
             }
             catch (Exception ex)
             {

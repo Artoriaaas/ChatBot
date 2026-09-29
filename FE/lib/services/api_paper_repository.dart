@@ -1,3 +1,4 @@
+import 'package:paper_chat/models/document_reference.dart';
 import 'package:paper_chat/models/paper.dart';
 import 'package:paper_chat/services/api_service.dart';
 import 'package:paper_chat/services/mock_paper_repository.dart';
@@ -208,6 +209,21 @@ class ApiPaperRepository extends MockPaperRepository {
               ),
             );
         }
+      }
+
+      // 3. Tải danh sách References (Tài liệu tham khảo) nếu chưa có
+      if (paper.references.isEmpty) {
+        try {
+          final refsData = await _apiService.getDocumentReferences(int.parse(paper.documentId!));
+          if (refsData.isNotEmpty) {
+            paper.references = refsData.map((r) => DocumentReference.fromJson(r)).toList();
+          } else if (int.tryParse(paper.id) != null) {
+            final paperRefs = await _apiService.getPaperReferences(int.parse(paper.id));
+            if (paperRefs.isNotEmpty) {
+              paper.references = paperRefs.map((r) => DocumentReference.fromJson(r)).toList();
+            }
+          }
+        } catch (_) {}
       }
     }
   }

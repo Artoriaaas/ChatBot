@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using BusinessObject.Dtos;
+using DataAccessLayer;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChatBot.Controllers
 {
@@ -22,19 +24,22 @@ namespace ChatBot.Controllers
         private readonly IGrobidService _grobidService;
         private readonly ITextExtractionService _textExtractionService;
         private readonly IMemoryCache _cache;
+        private readonly AppDbContext _context;
 
         public DocumentController(
             IDocumentService documentService,
             IDocumentChunkService documentChunkService,
             IGrobidService grobidService,
             ITextExtractionService textExtractionService,
-            IMemoryCache cache)
+            IMemoryCache cache,
+            AppDbContext context)
         {
             _documentService = documentService;
             _documentChunkService = documentChunkService;
             _grobidService = grobidService;
             _textExtractionService = textExtractionService;
             _cache = cache;
+            _context = context;
         }
 
         [HttpGet("grobid-status")]
@@ -71,6 +76,8 @@ namespace ChatBot.Controllers
                 authors = result.Authors,
                 abstractText = result.AbstractText,
                 sectionsCount = result.Sections.Count,
+                referencesCount = result.References.Count,
+                references = result.References,
                 sections = result.Sections.Select(s => new
                 {
                     order = s.SectionOrder,
@@ -159,6 +166,64 @@ namespace ChatBot.Controllers
                     content = chunk.Content
                 };
             }));
+        }
+
+        [HttpGet("{id}/references")]
+        public async Task<IActionResult> GetReferences(int id)
+        {
+            var document = await _documentService.GetByIdAsync(id);
+            if (document == null)
+                return NotFound(new { message = "Không tìm thấy tài liệu." });
+
+            // 1. Lấy từ bảng DocumentReferences trong CSDL
+            var dbRefs = await _context.DocumentReferences
+                .Where(r => r.DocumentId == id)
+                .OrderBy(r => r.Id)
+                .Select(r => new DocumentReferenceDto
+                {
+                    RefKey = r.RefKey,
+                    Label = r.Label,
+                    Title = r.Title,
+                    Authors = r.Authors,
+                    Year = r.Year,
+                    Venue = r.Venue,
+                    Doi = r.Doi,
+                    Url = r.Url,
+                    RawCitationText = r.RawCitationText
+                })
+                .ToListAsync();
+
+            if (dbRefs.Count > 0)
+            {
+                return Ok(dbRefs);
+            }
+
+            // 2. Fallback: đọc từ file sidecar .references.json nếu có
+            if (!string.IsNullOrEmpty(document.FilePath))
+            {
+                var refsPath = document.FilePath + ".references.json";
+                if (System.IO.File.Exists(refsPath))
+                {
+                    try
+                    {
+                        var json = await System.IO.File.ReadAllTextAsync(refsPath);
+                        var refs = JsonSerializer.Deserialize<List<DocumentReferenceDto>>(json, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                        if (refs != null && refs.Count > 0)
+                        {
+                            return Ok(refs);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[DocumentController] Lỗi đọc references.json cho Doc {id}: {ex.Message}");
+                    }
+                }
+            }
+
+            return Ok(new List<DocumentReferenceDto>());
         }
 
         [HttpPost("upload")]

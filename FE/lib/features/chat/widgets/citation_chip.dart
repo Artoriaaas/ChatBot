@@ -22,10 +22,15 @@ class CitationChip extends StatelessWidget {
     
     // Format label based on active language
     String displayLabel = label;
-    final numMatch = RegExp(r'\d+').firstMatch(label);
-    if (numMatch != null) {
-      final pageNum = numMatch.group(0);
-      displayLabel = isVi ? 'tr. $pageNum' : 'p. $pageNum';
+    if (label.startsWith('[') && label.endsWith(']')) {
+      // Giữ nguyên nhãn trích dẫn [1], [2]...
+      displayLabel = label;
+    } else {
+      final numMatch = RegExp(r'\d+').firstMatch(label);
+      if (numMatch != null) {
+        final pageNum = numMatch.group(0);
+        displayLabel = isVi ? 'tr. $pageNum' : 'p. $pageNum';
+      }
     }
 
     return Tooltip(

@@ -1,10 +1,15 @@
+using BusinessObject.Dtos;
 using BusinessObject.Entities;
+using DataAccessLayer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ServiceLayer.Interfaces;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace ChatBot.Controllers
@@ -14,10 +19,93 @@ namespace ChatBot.Controllers
     public class PaperController : ControllerBase
     {
         private readonly IPaperService _paperService;
+        private readonly AppDbContext _context;
 
-        public PaperController(IPaperService paperService)
+        public PaperController(IPaperService paperService, AppDbContext context)
         {
             _paperService = paperService;
+            _context = context;
+        }
+
+        [HttpGet("{id}/references")]
+        public async Task<IActionResult> GetPaperReferences(int id)
+        {
+            try
+            {
+                var paper = await _paperService.GetByIdAsync(id);
+                if (paper == null)
+                    return NotFound(new { message = "Không tìm thấy bài báo." });
+
+                if (!paper.DocumentId.HasValue)
+                {
+                    return Ok(new List<DocumentReferenceDto>());
+                }
+
+                int docId = paper.DocumentId.Value;
+
+                // 1. Lấy từ bảng DocumentReferences trong CSDL
+                var dbRefs = await _context.DocumentReferences
+                    .Where(r => r.DocumentId == docId)
+                    .OrderBy(r => r.Id)
+                    .Select(r => new DocumentReferenceDto
+                    {
+                        RefKey = r.RefKey,
+                        Label = r.Label,
+                        Title = r.Title,
+                        Authors = r.Authors,
+                        Year = r.Year,
+                        Venue = r.Venue,
+                        Doi = r.Doi,
+                        Url = r.Url,
+                        RawCitationText = r.RawCitationText
+                    })
+                    .ToListAsync();
+
+                if (dbRefs.Count > 0)
+                {
+                    return Ok(dbRefs);
+                }
+
+                // 2. Fallback: đọc từ file sidecar .references.json nếu có
+                var filePath = paper.FilePath;
+                if (string.IsNullOrWhiteSpace(filePath) || !System.IO.File.Exists(filePath))
+                {
+                    if (paper.Document != null && !string.IsNullOrWhiteSpace(paper.Document.FilePath))
+                    {
+                        filePath = paper.Document.FilePath;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    var refsPath = filePath + ".references.json";
+                    if (System.IO.File.Exists(refsPath))
+                    {
+                        try
+                        {
+                            var json = await System.IO.File.ReadAllTextAsync(refsPath);
+                            var refs = JsonSerializer.Deserialize<List<DocumentReferenceDto>>(json, new JsonSerializerOptions
+                            {
+                                PropertyNameCaseInsensitive = true
+                            });
+                            if (refs != null && refs.Count > 0)
+                            {
+                                return Ok(refs);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[PaperController] Lỗi đọc references.json cho Paper {id}: {ex.Message}");
+                        }
+                    }
+                }
+
+                return Ok(new List<DocumentReferenceDto>());
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
         }
 
         [HttpGet]

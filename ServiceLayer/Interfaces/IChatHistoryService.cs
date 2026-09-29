@@ -11,6 +11,7 @@ namespace ServiceLayer.Interfaces
             string question,
             string answer,
             List<DocumentChunk> retrievedChunks,
+            int? documentId,
             Guid? subjectId,
             Guid? chapterId,
             string? userId,
@@ -23,6 +24,7 @@ namespace ServiceLayer.Interfaces
             string? userId,
             Guid? subjectId = null,
             Guid? chapterId = null,
-            int take = 20);
+            int take = 20,
+            int? documentId = null);
     }
 }

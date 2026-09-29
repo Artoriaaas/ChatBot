@@ -3,12 +3,18 @@ class Citation {
   final int page;
   final String excerpt;
   final String label; // e.g., '[1]'
+  final int? sourceIndex; // 1-based index e.g., 1, 2, 3...
+  final String? fileName;
+  final int? chunkOrder;
   
   const Citation({
     required this.paperId,
     required this.page,
     required this.excerpt,
     required this.label,
+    this.sourceIndex,
+    this.fileName,
+    this.chunkOrder,
   });
 }
 

@@ -3,35 +3,84 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:paper_chat/models/chat_message.dart';
 import 'package:paper_chat/models/paper.dart';
+import 'package:paper_chat/services/api_service.dart';
 import 'package:paper_chat/services/mock_ai_service.dart';
 
 class ChatViewModel extends ChangeNotifier {
   final AiService _aiService;
+  final ApiService? _apiService;
 
   final Map<String, List<ChatMessage>> _conversations = {};
+  List<Map<String, dynamic>> _chatHistory = [];
   String? _currentPaperId;
   Paper? _currentPaper;
   bool _isStreaming = false;
+  bool _isHistoryLoading = false;
+  String? _historyError;
+  int _historyRequestVersion = 0;
   StreamSubscription<AiStreamEvent>? _streamSub;
   String? _selectedTextForChat;
   String? _scope;
 
-  ChatViewModel(this._aiService);
+  ChatViewModel(this._aiService, [this._apiService]);
 
   Paper? get currentPaper => _currentPaper;
   List<ChatMessage> get currentMessages =>
       _conversations[_currentPaperId] ?? [];
+  List<Map<String, dynamic>> get chatHistory => _chatHistory;
   bool get isStreaming => _isStreaming;
+  bool get isHistoryLoading => _isHistoryLoading;
+  String? get historyError => _historyError;
   String? get selectedTextForChat => _selectedTextForChat;
   String get scope => _scope ?? 'paper';
 
   void setCurrentPaper(Paper paper) {
-    if (_currentPaperId != paper.id) {
+    final changedPaper = _currentPaperId != paper.id;
+    if (changedPaper) {
       stopStreaming();
+      _chatHistory = [];
+      _historyError = null;
+      _isHistoryLoading = false;
     }
     _currentPaperId = paper.id;
     _currentPaper = paper;
     notifyListeners();
+    if (changedPaper) {
+      unawaited(loadChatHistory());
+    }
+  }
+
+  Future<void> loadChatHistory() async {
+    final requestVersion = ++_historyRequestVersion;
+    final documentId = int.tryParse(_currentPaper?.documentId ?? '');
+    if (_apiService == null || documentId == null) {
+      _chatHistory = [];
+      _isHistoryLoading = false;
+      _historyError = null;
+      notifyListeners();
+      return;
+    }
+
+    _isHistoryLoading = true;
+    _historyError = null;
+    notifyListeners();
+
+    try {
+      final history = await _apiService.getHistory(
+        documentId: documentId,
+        take: 100,
+      );
+      if (requestVersion != _historyRequestVersion) return;
+      _chatHistory = history;
+    } catch (error) {
+      if (requestVersion != _historyRequestVersion) return;
+      _historyError = error.toString();
+    } finally {
+      if (requestVersion == _historyRequestVersion) {
+        _isHistoryLoading = false;
+        notifyListeners();
+      }
+    }
   }
 
   void setSelectedText(String? text) {
@@ -98,6 +147,7 @@ class ChatViewModel extends ChangeNotifier {
             citations: event.citations ?? [],
           );
           _isStreaming = false;
+          unawaited(loadChatHistory());
         } else {
           msgs[idx] = msgs[idx].copyWith(
             content: msgs[idx].content + event.textChunk,

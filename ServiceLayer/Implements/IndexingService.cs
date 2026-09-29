@@ -69,16 +69,60 @@ namespace ServiceLayer.Implements
                     return (false, extractionResult.ErrorMessage);
                 }
 
-                // 1.1 Lưu cấu trúc các phân đoạn (Sections) vào file sidecar để FE đọc nhanh
+                // 1.1 Lưu cấu trúc các phân đoạn (Sections) và References vào file sidecar để FE đọc nhanh
                 try
                 {
                     var structureJsonPath = document.FilePath + ".structure.json";
                     var json = JsonSerializer.Serialize(extractionResult.Sections);
                     await File.WriteAllTextAsync(structureJsonPath, json);
+
+                    if (extractionResult.References != null && extractionResult.References.Count > 0)
+                    {
+                        var refsJsonPath = document.FilePath + ".references.json";
+                        var refsJson = JsonSerializer.Serialize(extractionResult.References, new JsonSerializerOptions { WriteIndented = true });
+                        await File.WriteAllTextAsync(refsJsonPath, refsJson);
+                    }
                 }
                 catch (Exception jsonEx)
                 {
-                    Console.WriteLine($"[Indexing] ⚠️ Không thể lưu file structure.json: {jsonEx.Message}");
+                    Console.WriteLine($"[Indexing] ⚠️ Không thể lưu file sidecar (structure/references): {jsonEx.Message}");
+                }
+
+                // 1.1b Lưu danh sách tài liệu tham khảo (References) vào cơ sở dữ liệu
+                try
+                {
+                    var existingRefs = await _context.DocumentReferences
+                        .Where(r => r.DocumentId == document.Id)
+                        .ToListAsync();
+                    if (existingRefs.Any())
+                    {
+                        _context.DocumentReferences.RemoveRange(existingRefs);
+                    }
+
+                    if (extractionResult.References != null && extractionResult.References.Count > 0)
+                    {
+                        var docRefs = extractionResult.References.Select(r => new DocumentReference
+                        {
+                            DocumentId = document.Id,
+                            RefKey = r.RefKey,
+                            Label = r.Label,
+                            Title = r.Title,
+                            Authors = r.Authors,
+                            Year = r.Year,
+                            Venue = r.Venue,
+                            Doi = r.Doi,
+                            Url = r.Url,
+                            RawCitationText = r.RawCitationText
+                        }).ToList();
+
+                        await _context.DocumentReferences.AddRangeAsync(docRefs);
+                        await _context.SaveChangesAsync();
+                        Console.WriteLine($"[Indexing] ✅ Đã lưu {docRefs.Count} trích dẫn vào cơ sở dữ liệu cho Doc {document.Id}.");
+                    }
+                }
+                catch (Exception refEx)
+                {
+                    Console.WriteLine($"[Indexing] ⚠️ Lưu DocumentReferences vào DB thất bại: {refEx.Message}");
                 }
 
                 // 1.2 Tự động đồng bộ metadata trích xuất được vào Paper tương ứng nếu có

@@ -21,6 +21,9 @@ class ReaderPane extends StatefulWidget {
   final String searchQuery;
   final Set<String> highlights;
   final String? highlightedCitationText;
+  final String? highlightedCitationRefKey;
+  final String? highlightedCitationLabel;
+  final int citationJumpTrigger;
   final ValueChanged<String> onTextSelected;
   final VoidCallback onClearSelection;
   final VoidCallback onExplain;
@@ -28,6 +31,7 @@ class ReaderPane extends StatefulWidget {
   final VoidCallback onAskAi;
   final VoidCallback onAddNote;
   final ValueChanged<String> onToggleHighlight;
+  final VoidCallback? onOpenReferences;
 
   const ReaderPane({
     super.key,
@@ -41,6 +45,9 @@ class ReaderPane extends StatefulWidget {
     required this.searchQuery,
     required this.highlights,
     this.highlightedCitationText,
+    this.highlightedCitationRefKey,
+    this.highlightedCitationLabel,
+    this.citationJumpTrigger = 0,
     required this.onTextSelected,
     required this.onClearSelection,
     required this.onExplain,
@@ -48,6 +55,7 @@ class ReaderPane extends StatefulWidget {
     required this.onAskAi,
     required this.onAddNote,
     required this.onToggleHighlight,
+    this.onOpenReferences,
   });
 
   @override
@@ -57,6 +65,8 @@ class ReaderPane extends StatefulWidget {
 class _ReaderPaneState extends State<ReaderPane> {
   final ScrollController _scrollController = ScrollController();
   final List<GlobalKey> _sectionKeys = [];
+  final GlobalKey _targetCitationKey = GlobalKey();
+  bool _hasAssignedCitationKey = false;
   OverlayEntry? _overlayEntry;
   String _currentSelection = '';
 
@@ -64,8 +74,8 @@ class _ReaderPaneState extends State<ReaderPane> {
   void initState() {
     super.initState();
     _syncKeys();
-    if (widget.isContinuousMode && widget.currentPage > 0) {
-      _scrollToSection(widget.currentPage);
+    if (widget.citationJumpTrigger > 0 || (widget.isContinuousMode && widget.currentPage > 0)) {
+      _scrollToCitationOrSection();
     }
   }
 
@@ -73,11 +83,18 @@ class _ReaderPaneState extends State<ReaderPane> {
   void didUpdateWidget(ReaderPane oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncKeys();
-    if (widget.isContinuousMode &&
-        (widget.currentPage != oldWidget.currentPage ||
-            (widget.highlightedCitationText != null &&
-                widget.highlightedCitationText != oldWidget.highlightedCitationText))) {
-      _scrollToSection(widget.currentPage);
+    final bool citationTriggerChanged = widget.citationJumpTrigger != oldWidget.citationJumpTrigger;
+    final bool citationTextChanged = widget.highlightedCitationText != null &&
+        widget.highlightedCitationText != oldWidget.highlightedCitationText;
+    final bool citationLabelChanged = widget.highlightedCitationLabel != null &&
+        widget.highlightedCitationLabel != oldWidget.highlightedCitationLabel;
+    final bool pageChanged = widget.currentPage != oldWidget.currentPage;
+
+    if (citationTriggerChanged ||
+        citationTextChanged ||
+        citationLabelChanged ||
+        (widget.isContinuousMode && pageChanged)) {
+      _scrollToCitationOrSection();
     }
   }
 
@@ -87,10 +104,52 @@ class _ReaderPaneState extends State<ReaderPane> {
     }
   }
 
+  void _scrollToCitationOrSection() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final targetContext = _targetCitationKey.currentContext;
+      if (targetContext != null) {
+        Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0.35,
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeInOutCubic,
+        );
+        return;
+      }
+
+      // Retry next frame in case child widget is still finishing layout
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final retryContext = _targetCitationKey.currentContext;
+        if (retryContext != null) {
+          Scrollable.ensureVisible(
+            retryContext,
+            alignment: 0.35,
+            duration: const Duration(milliseconds: 450),
+            curve: Curves.easeInOutCubic,
+          );
+        } else if (widget.isContinuousMode &&
+            widget.currentPage >= 0 &&
+            widget.currentPage < _sectionKeys.length) {
+          final keyContext = _sectionKeys[widget.currentPage].currentContext;
+          if (keyContext != null) {
+            Scrollable.ensureVisible(
+              keyContext,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeInOutCubic,
+            );
+          }
+        }
+      });
+    });
+  }
+
   void _scrollToSection(int index) {
     if (!widget.isContinuousMode) return;
     if (index >= 0 && index < _sectionKeys.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         final keyContext = _sectionKeys[index].currentContext;
         if (keyContext != null) {
           Scrollable.ensureVisible(
@@ -160,6 +219,15 @@ class _ReaderPaneState extends State<ReaderPane> {
     if (href.startsWith('cite:')) {
       final refKey = href.substring(5).trim();
       _showCitationDialog(refKey, text, colors);
+      return;
+    }
+
+    if (href.startsWith('arxiv:')) {
+      final id = href.substring(6).trim();
+      final uri = Uri.tryParse('https://arxiv.org/abs/$id');
+      if (uri != null) {
+        launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
       return;
     }
 
@@ -385,6 +453,17 @@ class _ReaderPaneState extends State<ReaderPane> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    if (widget.onOpenReferences != null) ...[
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          widget.onOpenReferences!();
+                        },
+                        icon: const Icon(Icons.format_quote_rounded, size: 16),
+                        label: Text(widget.strings.references),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     TextButton.icon(
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
@@ -493,6 +572,123 @@ class _ReaderPaneState extends State<ReaderPane> {
     );
   }
 
+  String _prepareContentForDisplay(String raw) {
+    if (raw.isEmpty) return raw;
+    var text = raw;
+
+    // 1. Loại bỏ các thẻ HTML anchor thô như <a id="ref-b0"></a>
+    text = text.replaceAll(RegExp(r'<a\s+id=["\x27]?[^>"\x27]*["\x27]?\s*>\s*<\/a>', caseSensitive: false), '');
+
+    // 2. Chuyển đổi mã arXiv (ví dụ: arXiv:2603.12345 hoặc arXiv:2006.12345v1) thành link Markdown có thể bấm được
+    // Tránh double link nếu đã nằm trong [arXiv:...](...)
+    text = text.replaceAllMapped(
+      RegExp(r'(?<!\[|\/)(?:arXiv|arxiv)[:\s]+([0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?|[a-z\-]+(?:\.[a-z]{2})?\/[0-9]{7})(?!\)|\])', caseSensitive: false),
+      (match) {
+        final id = match.group(1)!;
+        return '[arXiv:$id](https://arxiv.org/abs/$id)';
+      },
+    );
+
+    // 3. Chuyển đổi bare arXiv URL thành Markdown link nếu chưa được link
+    text = text.replaceAllMapped(
+      RegExp(r'(?<!\()https?:\/\/arxiv\.org\/(?:abs|pdf)\/([0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?|[a-z\-]+(?:\.[a-z]{2})?\/[0-9]{7})(?!\))', caseSensitive: false),
+      (match) {
+        final fullUrl = match.group(0)!;
+        final id = match.group(1)!;
+        return '[arXiv:$id]($fullUrl)';
+      },
+    );
+
+    // 4. Nếu dòng bắt đầu bằng [1] mà chưa in đậm và không phải link Markdown, chuyển thành **[1]**
+    text = text.replaceAllMapped(
+      RegExp(r'(^|\n)\s*\[([0-9A-Za-z]+)\](?!\()', caseSensitive: false),
+      (match) => '${match.group(1)}**[${match.group(2)}]**',
+    );
+
+    return text;
+  }
+
+  List<String> _splitMarkdownBlocks(String markdown) {
+    if (markdown.trim().isEmpty) return [];
+    final lines = markdown.split(RegExp(r'\r?\n'));
+    final blocks = <String>[];
+    final currentBlock = <String>[];
+    bool inCodeBlock = false;
+    bool inMathBlock = false;
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+      } else if (trimmed.startsWith(r'$$') || (trimmed.endsWith(r'$$') && trimmed.length > 2)) {
+        final count = RegExp(r'\$\$').allMatches(line).length;
+        if (count % 2 == 1) {
+          inMathBlock = !inMathBlock;
+        }
+      }
+
+      if (!inCodeBlock && !inMathBlock && trimmed.isEmpty) {
+        if (currentBlock.isNotEmpty) {
+          final text = currentBlock.join('\n').trim();
+          if (text.isNotEmpty) {
+            blocks.add(text);
+          }
+          currentBlock.clear();
+        }
+      } else {
+        currentBlock.add(line);
+      }
+    }
+
+    if (currentBlock.isNotEmpty) {
+      final text = currentBlock.join('\n').trim();
+      if (text.isNotEmpty) {
+        blocks.add(text);
+      }
+    }
+
+    return blocks;
+  }
+
+  bool _blockContainsCitation(
+    String blockContent,
+    String? refKey,
+    String? label,
+    String? excerpt,
+  ) {
+    final lower = blockContent.toLowerCase();
+
+    if (excerpt != null && excerpt.isNotEmpty && lower.contains(excerpt.toLowerCase())) {
+      return true;
+    }
+
+    if (refKey != null && refKey.trim().isNotEmpty) {
+      final cleanKey = refKey.trim().toLowerCase();
+      final stripped = cleanKey.replaceAll(RegExp(r'^[#b]+'), '');
+      if (lower.contains('cite:$cleanKey') ||
+          (stripped.isNotEmpty && (lower.contains('cite:b$stripped') || lower.contains('cite:$stripped')))) {
+        return true;
+      }
+    }
+
+    if (label != null && label.trim().isNotEmpty) {
+      final cleanLabel = label.trim().toLowerCase();
+      final patterns = [
+        '[$cleanLabel]',
+        '[\\$cleanLabel]',
+        '[\\[$cleanLabel\\]]',
+        '[$cleanLabel](',
+      ];
+      for (final p in patterns) {
+        if (lower.contains(p)) return true;
+      }
+      final reg = RegExp(r'\[(?:\\\[)?' + RegExp.escape(cleanLabel) + r'(?:\\\])?\]');
+      if (reg.hasMatch(blockContent)) return true;
+    }
+
+    return false;
+  }
+
   Widget _buildSectionWidget({
     required PaperPage page,
     required int index,
@@ -501,48 +697,77 @@ class _ReaderPaneState extends State<ReaderPane> {
     required MarkdownStyleSheet styleSheet,
     Key? key,
   }) {
-    final textContent = page.content;
+    final textContent = _prepareContentForDisplay(page.content);
+    final blocks = _splitMarkdownBlocks(textContent);
+    final isTargetPage = index == widget.currentPage;
 
-    Widget textWidget = MarkdownBody(
-      data: textContent,
-      selectable: false,
-      extensionSet: md.ExtensionSet.gitHubFlavored,
-      inlineSyntaxes: [
-        BlockMathSyntax(),
-        MathSyntax(),
-      ],
-      builders: {
-        'math': MathBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary)),
-        'math-block': MathBlockBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary)),
-      },
-      styleSheet: styleSheet,
-      onTapLink: (text, href, title) {
-        _handleLinkTap(text, href, colors);
-      },
-    );
+    final blockWidgets = <Widget>[];
+    for (final block in blocks) {
+      final bool isCitationTarget = isTargetPage &&
+          !_hasAssignedCitationKey &&
+          (widget.highlightedCitationLabel != null ||
+              widget.highlightedCitationRefKey != null ||
+              widget.highlightedCitationText != null) &&
+          _blockContainsCitation(
+            block,
+            widget.highlightedCitationRefKey,
+            widget.highlightedCitationLabel,
+            widget.highlightedCitationText,
+          );
 
-    if (widget.highlightedCitationText != null &&
-        textContent.contains(widget.highlightedCitationText!)) {
-      textWidget = AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: colors.highlightBackground,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: colors.onHighlight.withValues(alpha: 0.4)),
-        ),
-        child: textWidget,
+      if (isCitationTarget) {
+        _hasAssignedCitationKey = true;
+      }
+
+      Widget blockWidget = MarkdownBody(
+        data: block,
+        selectable: false,
+        extensionSet: md.ExtensionSet.gitHubFlavored,
+        inlineSyntaxes: [
+          BlockMathSyntax(),
+          MathSyntax(),
+        ],
+        builders: {
+          'math': MathBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary)),
+          'math-block': MathBlockBuilder(textStyle: AppTypography.body.copyWith(color: colors.textPrimary)),
+        },
+        styleSheet: styleSheet,
+        onTapLink: (text, href, title) {
+          _handleLinkTap(text, href, colors);
+        },
       );
-    } else if (widget.searchQuery.isNotEmpty &&
-        textContent.toLowerCase().contains(widget.searchQuery.toLowerCase())) {
-      textWidget = Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: colors.selectionBackground,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: colors.primary.withValues(alpha: 0.3)),
+
+      if (isCitationTarget) {
+        blockWidget = AnimatedContainer(
+          duration: const Duration(milliseconds: 350),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: colors.primary.withValues(alpha: 0.6), width: 1.5),
+          ),
+          child: blockWidget,
+        );
+      } else if (widget.searchQuery.isNotEmpty &&
+          block.toLowerCase().contains(widget.searchQuery.toLowerCase())) {
+        blockWidget = Container(
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: colors.selectionBackground,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: colors.primary.withValues(alpha: 0.3)),
+          ),
+          child: blockWidget,
+        );
+      }
+
+      blockWidgets.add(
+        KeyedSubtree(
+          key: isCitationTarget ? _targetCitationKey : null,
+          child: blockWidget,
         ),
-        child: textWidget,
       );
     }
 
@@ -584,7 +809,10 @@ class _ReaderPaneState extends State<ReaderPane> {
             ],
           ),
           const SizedBox(height: 16),
-          textWidget,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: blockWidgets,
+          ),
           const SizedBox(height: 20),
           Divider(height: 1, color: colors.divider.withValues(alpha: 0.4)),
         ],
@@ -594,6 +822,7 @@ class _ReaderPaneState extends State<ReaderPane> {
 
   @override
   Widget build(BuildContext context) {
+    _hasAssignedCitationKey = false;
     final colors = AppColorsExtension.of(context);
     final baseFontSize = 14.5 * widget.zoomLevel;
     final styleSheet = _buildMarkdownStyleSheet(colors, baseFontSize);

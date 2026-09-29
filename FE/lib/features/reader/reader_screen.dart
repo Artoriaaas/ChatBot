@@ -8,8 +8,10 @@ import 'package:paper_chat/features/reader/widgets/original_pdf_viewer.dart';
 import 'package:paper_chat/features/reader/widgets/paper_info_panel.dart';
 import 'package:paper_chat/features/reader/widgets/reader_pane.dart';
 import 'package:paper_chat/features/reader/widgets/reader_toolbar.dart';
+import 'package:paper_chat/features/reader/widgets/references_panel.dart';
 import 'package:paper_chat/features/reader/widgets/table_of_contents.dart';
 import 'package:paper_chat/features/settings/settings_view_model.dart';
+import 'package:paper_chat/models/document_reference.dart';
 import 'package:paper_chat/models/note.dart';
 import 'package:paper_chat/models/paper.dart';
 import 'package:paper_chat/services/api_paper_repository.dart';
@@ -46,9 +48,11 @@ class ReaderScreen extends StatefulWidget {
 class _ReaderScreenState extends State<ReaderScreen> {
   double _tocWidth = 220;
   double _infoWidth = 280;
+  double _referencesWidth = 320;
   double _chatWidth = 400;
   bool _isTocOpen = false;
   bool _isInfoOpen = false;
+  bool _isReferencesOpen = false;
   ReaderViewMode _viewMode = ReaderViewMode.ai;
   bool _isHighlightMode = false;
   int _activeNarrowTab = 0; // 0=reader, 1=chat (for narrow mode)
@@ -78,6 +82,46 @@ class _ReaderScreenState extends State<ReaderScreen> {
           widget.readerViewModel.notifyPaperUpdated();
         }
       } catch (_) {}
+    }
+    if (widget.paper.references.isEmpty) {
+      await _reloadReferences();
+    }
+  }
+
+  Future<void> _reloadReferences() async {
+    try {
+      final apiService = ApiService();
+      List<Map<String, dynamic>> refsData = [];
+      if (widget.paper.documentId != null) {
+        refsData = await apiService.getDocumentReferences(int.parse(widget.paper.documentId!));
+      }
+      if (refsData.isEmpty && int.tryParse(widget.paper.id) != null) {
+        refsData = await apiService.getPaperReferences(int.parse(widget.paper.id));
+      }
+      if (refsData.isNotEmpty && mounted) {
+        setState(() {
+          widget.paper.references = refsData.map((r) => DocumentReference.fromJson(r)).toList();
+        });
+        widget.readerViewModel.notifyPaperUpdated();
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback: Nếu API chưa có, parse ngay từ các trang có tiêu đề Reference/Bibliography
+    if (widget.paper.references.isEmpty) {
+      for (final page in widget.paper.pages) {
+        final t = page.sectionTitle.toLowerCase();
+        if (t.contains('reference') || t.contains('tài liệu tham khảo') || t.contains('bibliography')) {
+          final parsed = DocumentReference.parseFromText(page.content);
+          if (parsed.isNotEmpty && mounted) {
+            setState(() {
+              widget.paper.references = parsed;
+            });
+            widget.readerViewModel.notifyPaperUpdated();
+            break;
+          }
+        }
+      }
     }
   }
 
@@ -145,6 +189,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 if (_isInfoOpen) {
                   setState(() => _isInfoOpen = false);
                 }
+                if (_isReferencesOpen) {
+                  setState(() => _isReferencesOpen = false);
+                }
                 widget.readerViewModel.clearSelection();
               },
             },
@@ -157,14 +204,28 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     settingsVM: widget.settingsViewModel,
                     onToggleToc: () => setState(() {
                       _isTocOpen = !_isTocOpen;
-                      if (_isTocOpen) _isInfoOpen = false;
+                      if (_isTocOpen) {
+                        _isInfoOpen = false;
+                        _isReferencesOpen = false;
+                      }
                     }),
                     isTocOpen: _isTocOpen,
                     onToggleInfo: () => setState(() {
                       _isInfoOpen = !_isInfoOpen;
-                      if (_isInfoOpen) _isTocOpen = false;
+                      if (_isInfoOpen) {
+                        _isTocOpen = false;
+                        _isReferencesOpen = false;
+                      }
                     }),
                     isInfoOpen: _isInfoOpen,
+                    onToggleReferences: () => setState(() {
+                      _isReferencesOpen = !_isReferencesOpen;
+                      if (_isReferencesOpen) {
+                        _isTocOpen = false;
+                        _isInfoOpen = false;
+                      }
+                    }),
+                    isReferencesOpen: _isReferencesOpen,
                     viewMode: _viewMode,
                     onViewModeChanged: (mode) => setState(() => _viewMode = mode),
                     currentPage: widget.readerViewModel.currentPage,
@@ -234,6 +295,40 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           onDragUpdate: (delta) {
                             setState(() {
                               _infoWidth = (_infoWidth + delta).clamp(220.0, 420.0);
+                            });
+                          },
+                        ),
+                      ],
+
+                      // References Panel (collapsible side panel style)
+                      if (_isReferencesOpen && !isNarrow) ...[
+                        SizedBox(
+                          width: _referencesWidth,
+                          child: ListenableBuilder(
+                            listenable: widget.readerViewModel,
+                            builder: (context, _) => ReferencesPanel(
+                              settingsVM: widget.settingsViewModel,
+                              paper: widget.paper,
+                              onClose: () => setState(() => _isReferencesOpen = false),
+                              onJumpToCitation: (ref) {
+                                final jumped = widget.readerViewModel.jumpToCitationByReference(ref.refKey, ref.label);
+                                if (!jumped && mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(widget.settingsViewModel.strings.citationMentionNotFound),
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                              },
+                              onReload: _reloadReferences,
+                            ),
+                          ),
+                        ),
+                        VerticalDragHandle(
+                          onDragUpdate: (delta) {
+                            setState(() {
+                              _referencesWidth = (_referencesWidth + delta).clamp(240.0, 480.0);
                             });
                           },
                         ),
@@ -408,6 +503,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
           searchQuery: widget.readerViewModel.searchQuery,
           highlights: widget.readerViewModel.currentHighlights,
           highlightedCitationText: widget.readerViewModel.highlightedCitationText,
+          highlightedCitationRefKey: widget.readerViewModel.highlightedCitationRefKey,
+          highlightedCitationLabel: widget.readerViewModel.highlightedCitationLabel,
+          citationJumpTrigger: widget.readerViewModel.citationJumpTrigger,
           onTextSelected: (text) {
             widget.readerViewModel.selectText(text);
             if (_isHighlightMode) {
@@ -426,6 +524,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
               widget.readerViewModel.addHighlight(text);
             }
           },
+          onOpenReferences: () => setState(() {
+            _isReferencesOpen = true;
+            _isTocOpen = false;
+            _isInfoOpen = false;
+          }),
         );
       },
     );

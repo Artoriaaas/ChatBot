@@ -40,6 +40,9 @@ class MessageBubble extends StatefulWidget {
   static String cleanExcerptForDisplay(String raw) {
     if (raw.isEmpty) return raw;
     String clean = raw;
+    // 0. Loại bỏ các thẻ HTML anchor thô <a id="ref-b0"></a>
+    clean = clean.replaceAll(RegExp(r'<a\s+id=["\x27]?[^>"\x27]*["\x27]?\s*>\s*<\/a>', caseSensitive: false), '');
+
     // 1. Chuyển đổi cú pháp cite kỹ thuật: [\[1\]](cite:b0) -> [1] hoặc [1](cite:b0) -> [1]
     clean = clean.replaceAllMapped(
       RegExp(r'\[(?:\\\[)?(\d+)(?:\\\])?\]\(cite:[^\)]+\)'),
@@ -49,6 +52,14 @@ class MessageBubble extends StatefulWidget {
     clean = clean.replaceAllMapped(
       RegExp(r'^(#{1,3})\s+(.+)$', multiLine: true),
       (m) => '**${m.group(2)}**',
+    );
+    // 3. Chuyển đổi raw arXiv thành liên kết Markdown
+    clean = clean.replaceAllMapped(
+      RegExp(r'(?<!\[|\/)(?:arXiv|arxiv)[:\s]+([0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?|[a-z\-]+(?:\.[a-z]{2})?\/[0-9]{7})(?!\)|\])', caseSensitive: false),
+      (match) {
+        final id = match.group(1)!;
+        return '[arXiv:$id](https://arxiv.org/abs/$id)';
+      },
     );
     return clean.trim();
   }

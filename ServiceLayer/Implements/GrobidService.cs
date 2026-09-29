@@ -548,13 +548,26 @@ namespace ServiceLayer.Implements
                             foreach (var r in references)
                             {
                                 var lineSb = new StringBuilder();
-                                lineSb.Append($"<a id=\"ref-{r.RefKey}\"></a>**[{r.Label}]** ");
+                                lineSb.Append($"**[{r.Label}]** ");
                                 if (!string.IsNullOrWhiteSpace(r.Authors)) lineSb.Append($"{r.Authors}. ");
                                 if (r.Year.HasValue) lineSb.Append($"({r.Year.Value}). ");
                                 if (!string.IsNullOrWhiteSpace(r.Title)) lineSb.Append($"*{r.Title}*. ");
                                 if (!string.IsNullOrWhiteSpace(r.Venue)) lineSb.Append($"{r.Venue}. ");
-                                if (!string.IsNullOrWhiteSpace(r.Doi)) lineSb.Append($"https://doi.org/{r.Doi}");
-                                else if (!string.IsNullOrWhiteSpace(r.Url)) lineSb.Append($"{r.Url}");
+
+                                if (!string.IsNullOrWhiteSpace(r.Url) && r.Url.Contains("arxiv.org", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var arxMatch = Regex.Match(r.Url, @"(?:abs|pdf)/([0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?|[a-z\-]+(?:\.[a-z]{2})?/[0-9]{7})", RegexOptions.IgnoreCase);
+                                    var arxId = arxMatch.Success ? arxMatch.Groups[1].Value : "link";
+                                    lineSb.Append($"[arXiv:{arxId}]({r.Url})");
+                                }
+                                else if (!string.IsNullOrWhiteSpace(r.Doi))
+                                {
+                                    lineSb.Append($"[https://doi.org/{r.Doi}](https://doi.org/{r.Doi})");
+                                }
+                                else if (!string.IsNullOrWhiteSpace(r.Url))
+                                {
+                                    lineSb.Append($"[{r.Url}]({r.Url})");
+                                }
                                 else if (!string.IsNullOrWhiteSpace(r.RawCitationText) && string.IsNullOrWhiteSpace(r.Title)) lineSb.Append(r.RawCitationText);
 
                                 refSb.AppendLine(lineSb.ToString().Trim());
@@ -1085,10 +1098,14 @@ namespace ServiceLayer.Implements
                 }
                 venue = CleanWhitespace(venue);
 
-                // DOI & URL
+                // DOI, arXiv & URL
                 var doiNode = bibl.Descendants(ns + "idno")
                     .FirstOrDefault(n => string.Equals((string?)n.Attribute("type"), "DOI", StringComparison.OrdinalIgnoreCase));
                 string? doi = CleanWhitespace(doiNode?.Value);
+
+                var arxivNode = bibl.Descendants(ns + "idno")
+                    .FirstOrDefault(n => string.Equals((string?)n.Attribute("type"), "arXiv", StringComparison.OrdinalIgnoreCase));
+                string? arxivId = CleanWhitespace(arxivNode?.Value);
 
                 var ptrNode = bibl.Descendants(ns + "ptr").FirstOrDefault();
                 string? url = (string?)ptrNode?.Attribute("target");
@@ -1103,9 +1120,22 @@ namespace ServiceLayer.Implements
                     if (doiMatch.Success) doi = doiMatch.Groups[1].Value.TrimEnd('.', ',');
                 }
 
-                if (string.IsNullOrEmpty(url) && !string.IsNullOrEmpty(doi))
+                if (string.IsNullOrEmpty(arxivId) && !string.IsNullOrEmpty(rawCitation))
                 {
-                    url = $"https://doi.org/{doi}";
+                    var arxMatch = Regex.Match(rawCitation, @"\barXiv[:\s/]+([0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?|[a-z\-]+(?:\.[a-z]{2})?/[0-9]{7})\b", RegexOptions.IgnoreCase);
+                    if (arxMatch.Success) arxivId = arxMatch.Groups[1].Value;
+                }
+
+                if (string.IsNullOrEmpty(url))
+                {
+                    if (!string.IsNullOrEmpty(arxivId))
+                    {
+                        url = $"https://arxiv.org/abs/{arxivId}";
+                    }
+                    else if (!string.IsNullOrEmpty(doi))
+                    {
+                        url = $"https://doi.org/{doi}";
+                    }
                 }
 
                 list.Add(new DocumentReferenceDto

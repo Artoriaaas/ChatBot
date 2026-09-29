@@ -14,6 +14,9 @@ class ReaderViewModel extends ChangeNotifier {
   int? _highlightedCitationPage;
   bool _isContinuousMode = true;
   String? _highlightedCitationText;
+  String? _highlightedCitationRefKey;
+  String? _highlightedCitationLabel;
+  int _citationJumpTrigger = 0;
 
   Paper? get currentPaper => _currentPaper;
   bool get isContinuousMode => _isContinuousMode;
@@ -31,6 +34,9 @@ class ReaderViewModel extends ChangeNotifier {
   Set<String> get currentHighlights => _currentPaper != null ? _highlights[_currentPaper!.id] ?? {} : {};
   int? get highlightedCitationPage => _highlightedCitationPage;
   String? get highlightedCitationText => _highlightedCitationText;
+  String? get highlightedCitationRefKey => _highlightedCitationRefKey;
+  String? get highlightedCitationLabel => _highlightedCitationLabel;
+  int get citationJumpTrigger => _citationJumpTrigger;
   List<DocumentReference> get references => _currentPaper?.references ?? const [];
 
   DocumentReference? findReference(String refKey) {
@@ -147,16 +153,78 @@ class ReaderViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void navigateToCitation(int page, String? excerpt) {
+  void navigateToCitation(int page, String? excerpt, {String? targetRefKey, String? targetLabel}) {
     if (_currentPaper == null) return;
     _currentPage = page.clamp(0, totalPages - 1);
     _highlightedCitationPage = _currentPage;
     _highlightedCitationText = excerpt;
+    _highlightedCitationRefKey = targetRefKey;
+    _highlightedCitationLabel = targetLabel;
+    _citationJumpTrigger++;
     notifyListeners();
-    Future.delayed(const Duration(seconds: 2), () {
+    Future.delayed(const Duration(milliseconds: 3000), () {
       _highlightedCitationPage = null;
       _highlightedCitationText = null;
+      _highlightedCitationRefKey = null;
+      _highlightedCitationLabel = null;
       notifyListeners();
     });
+  }
+
+  int? findPageMentioningCitation(String refKey, String label) {
+    if (_currentPaper == null) return null;
+    final cleanKey = refKey.trim().toLowerCase();
+    final stripped = cleanKey.replaceAll(RegExp(r'^[#b]+'), '');
+    final cleanLabel = label.trim();
+
+    final patterns = [
+      if (cleanKey.isNotEmpty) 'cite:$cleanKey',
+      if (stripped.isNotEmpty) 'cite:b$stripped',
+      if (stripped.isNotEmpty) 'cite:$stripped',
+      if (cleanLabel.isNotEmpty) '[$cleanLabel]',
+      if (cleanLabel.isNotEmpty) '[\\$cleanLabel]',
+      if (cleanLabel.isNotEmpty) '[\\[$cleanLabel\\]]',
+      if (cleanLabel.isNotEmpty) '[$cleanLabel](',
+    ];
+
+    // Priority 1: Search main content pages (skip bibliography/references section itself)
+    for (int i = 0; i < _currentPaper!.pages.length; i++) {
+      final secTitle = _currentPaper!.pages[i].sectionTitle.toLowerCase();
+      if (secTitle.contains('reference') || secTitle.contains('tài liệu tham khảo')) {
+        continue;
+      }
+      final content = _currentPaper!.pages[i].content;
+      for (final p in patterns) {
+        if (content.toLowerCase().contains(p.toLowerCase())) {
+          return i;
+        }
+      }
+    }
+
+    // Priority 2: Fallback to all pages if not found in main body
+    for (int i = 0; i < _currentPaper!.pages.length; i++) {
+      final content = _currentPaper!.pages[i].content;
+      for (final p in patterns) {
+        if (content.toLowerCase().contains(p.toLowerCase())) {
+          return i;
+        }
+      }
+    }
+    return null;
+  }
+
+  bool jumpToCitationByReference(String refKey, String label) {
+    final page = findPageMentioningCitation(refKey, label);
+    if (page != null) {
+      final excerpt = label.isNotEmpty ? '[$label]' : null;
+      navigateToCitation(
+        page,
+        excerpt,
+        targetRefKey: refKey,
+        targetLabel: label,
+      );
+      return true;
+    }
+    return false;
   }
 }

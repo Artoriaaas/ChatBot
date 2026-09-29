@@ -107,6 +107,30 @@ class AppStrings {
   String searchMatchIndicator(int current, int total) =>
       isVi ? '$current/$total' : '$current/$total';
 
+  // References
+  String get references => isVi ? 'Tài liệu tham khảo' : 'References';
+  String get referencesHeader => isVi ? 'Tài liệu tham khảo' : 'References';
+  String get closeReferences =>
+      isVi ? 'Đóng danh sách tham khảo' : 'Close References';
+  String get searchReferencesHint =>
+      isVi ? 'Tìm kiếm tên bài, tác giả, năm...' : 'Search by title, author, year...';
+  String get noReferencesFound =>
+      isVi ? 'Không tìm thấy tài liệu tham khảo phù hợp' : 'No matching references found';
+  String get noReferencesInPaper =>
+      isVi ? 'Bài báo chưa có dữ liệu tài liệu tham khảo' : 'No references available for this paper';
+  String get refreshReferences =>
+      isVi ? 'Làm mới danh sách' : 'Refresh references';
+  String get copyCitation => isVi ? 'Sao chép trích dẫn' : 'Copy citation';
+  String get citationCopied =>
+      isVi ? 'Đã sao chép trích dẫn vào bộ nhớ tạm' : 'Citation copied to clipboard';
+  String get openReferenceLink => isVi ? 'Mở liên kết' : 'Open link';
+  String get jumpToCitationMention =>
+      isVi ? 'Xem vị trí trong bài' : 'Find in text';
+  String get citationMentionNotFound =>
+      isVi ? 'Không tìm thấy vị trí trích dẫn trong văn bản' : 'Citation mention not found in text';
+  String referencesCount(int count) =>
+      isVi ? '$count tài liệu' : '$count references';
+
   // Original File & View Modes
   String get originalFile => isVi ? 'File gốc' : 'Original File';
   String get aiContent => isVi ? 'Trích xuất AI' : 'AI Content';

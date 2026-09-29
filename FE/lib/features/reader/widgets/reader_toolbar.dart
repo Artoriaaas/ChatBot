@@ -15,6 +15,8 @@ class ReaderToolbar extends StatelessWidget {
   final bool isTocOpen;
   final VoidCallback? onToggleInfo;
   final bool isInfoOpen;
+  final VoidCallback? onToggleReferences;
+  final bool isReferencesOpen;
   final ReaderViewMode viewMode;
   final ValueChanged<ReaderViewMode>? onViewModeChanged;
   final int currentPage;
@@ -44,6 +46,8 @@ class ReaderToolbar extends StatelessWidget {
     required this.isTocOpen,
     this.onToggleInfo,
     this.isInfoOpen = false,
+    this.onToggleReferences,
+    this.isReferencesOpen = false,
     this.viewMode = ReaderViewMode.ai,
     this.onViewModeChanged,
     required this.currentPage,
@@ -136,6 +140,36 @@ class ReaderToolbar extends StatelessWidget {
                     ),
                     style: TextButton.styleFrom(
                       backgroundColor: isInfoOpen ? colors.selectionBackground : Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+
+              // References Toggle Button
+              if (onToggleReferences != null) ...[
+                Tooltip(
+                  message: strings.references,
+                  child: TextButton.icon(
+                    onPressed: onToggleReferences,
+                    icon: Icon(
+                      Icons.format_quote_rounded,
+                      size: 16,
+                      color: isReferencesOpen ? colors.primary : colors.textSecondary,
+                    ),
+                    label: Text(
+                      strings.references,
+                      style: AppTypography.caption.copyWith(
+                        fontWeight: isReferencesOpen ? FontWeight.w600 : FontWeight.w400,
+                        color: isReferencesOpen ? colors.primary : colors.textPrimary,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: isReferencesOpen ? colors.selectionBackground : Colors.transparent,
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,

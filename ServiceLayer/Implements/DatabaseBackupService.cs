@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Supabase;
@@ -22,6 +22,24 @@ namespace ServiceLayer.Implements
         {
             _logger.LogInformation("[BackupService] Khởi động Background Job sao lưu CSDL.");
 
+            // Chạy 1 lần sau khi khởi động 5 giây để kiểm tra và đẩy bản sao lưu đầu tiên lên Supabase
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(5000, stoppingToken);
+                    if (!stoppingToken.IsCancellationRequested)
+                    {
+                        _logger.LogInformation("[BackupService] Bắt đầu lần sao lưu khởi động đầu tiên...");
+                        await PerformBackupAsync(stoppingToken);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[BackupService] Lỗi xảy ra trong quá trình sao lưu khởi động.");
+                }
+            }, stoppingToken);
+
             using var timer = new PeriodicTimer(_backupInterval);
 
             while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
@@ -42,10 +60,42 @@ namespace ServiceLayer.Implements
             _logger.LogInformation("[BackupService] Đang bắt đầu sao lưu CSDL local...");
 
             string connectionString = _configuration.GetConnectionString("DefaultConnection") ?? "";
-            string pgDumpPath = _configuration["PG_DUMP_PATH"] ?? @"C:\Program Files\PostgreSQL\16\bin\pg_dump.exe";
-            string supabaseUrl = _configuration["SUPABASE_URL"] ?? "";
-            string supabaseKey = _configuration["SUPABASE_SERVICE_KEY"] ?? "";
-            string bucketName = _configuration["SUPABASE_BACKUP_BUCKET"] ?? "database-backups";
+            string pgDumpPath = _configuration["PgDumpPath"] 
+                ?? _configuration["PG_DUMP_PATH"] 
+                ?? Environment.GetEnvironmentVariable("PG_DUMP_PATH") 
+                ?? @"C:\Program Files\PostgreSQL\18\bin\pg_dump.exe";
+
+            if (!File.Exists(pgDumpPath))
+            {
+                string[] possiblePaths = new[]
+                {
+                    @"C:\Program Files\PostgreSQL\18\bin\pg_dump.exe",
+                    @"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe",
+                    @"C:\Program Files\PostgreSQL\16\bin\pg_dump.exe",
+                    @"C:\Program Files\PostgreSQL\15\bin\pg_dump.exe"
+                };
+                foreach (var p in possiblePaths)
+                {
+                    if (File.Exists(p))
+                    {
+                        pgDumpPath = p;
+                        break;
+                    }
+                }
+            }
+
+            string supabaseUrl = _configuration["Supabase:Url"] 
+                ?? _configuration["SUPABASE_URL"] 
+                ?? Environment.GetEnvironmentVariable("SUPABASE_URL") 
+                ?? "";
+            string supabaseKey = _configuration["Supabase:Key"] 
+                ?? _configuration["SUPABASE_SERVICE_KEY"] 
+                ?? Environment.GetEnvironmentVariable("SUPABASE_SERVICE_KEY") 
+                ?? "";
+            string bucketName = _configuration["Supabase:BackupBucket"] 
+                ?? _configuration["SUPABASE_BACKUP_BUCKET"] 
+                ?? Environment.GetEnvironmentVariable("SUPABASE_BACKUP_BUCKET") 
+                ?? "database-backups";
 
             if (string.IsNullOrEmpty(supabaseUrl) || string.IsNullOrEmpty(supabaseKey))
             {
@@ -90,6 +140,20 @@ namespace ServiceLayer.Implements
             var options = new SupabaseOptions { AutoConnectRealtime = false };
             var client = new Supabase.Client(supabaseUrl, supabaseKey, options);
             await client.InitializeAsync();
+
+            try
+            {
+                var buckets = await client.Storage.ListBuckets();
+                if (buckets == null || !buckets.Any(b => b.Name == bucketName))
+                {
+                    _logger.LogInformation($"[BackupService] Bucket '{bucketName}' chưa tồn tại. Đang tự động tạo bucket...");
+                    await client.Storage.CreateBucket(bucketName, new Supabase.Storage.BucketUpsertOptions { Public = false });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"[BackupService] Không thể tự động kiểm tra/tạo bucket: {ex.Message}. Thử tiến hành upload trực tiếp...");
+            }
 
             byte[] fileBytes = await File.ReadAllBytesAsync(tempFilePath, cancellationToken);
             await client.Storage.From(bucketName).Upload(fileBytes, fileName, new Supabase.Storage.FileOptions { Upsert = true });
